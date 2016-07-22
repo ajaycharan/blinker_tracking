@@ -7,6 +7,7 @@ project(blinker_tracking)
 find_package(catkin REQUIRED COMPONENTS
   cv_bridge
   image_transport
+  message_generation
   roscpp
   rospy
   sensor_msgs
@@ -54,6 +55,12 @@ find_package(OpenCV REQUIRED)
 #   Message2.msg
 # )
 
+add_message_files(
+    FILES
+    KeyPoint.msg
+    KeyPointArray.msg
+    )
+
 ## Generate services in the 'srv' folder
 # add_service_files(
 #   FILES
@@ -73,6 +80,11 @@ find_package(OpenCV REQUIRED)
 #   DEPENDENCIES
 #   sensor_msgs#   std_msgs
 # )
+
+generate_messages(
+    DEPENDENCIES
+    std_msgs
+    )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -104,11 +116,11 @@ find_package(OpenCV REQUIRED)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES blinker_tracking
-#  CATKIN_DEPENDS cv_bridge image_transport roscpp rospy sensor_msgs std_msgs
-#  DEPENDS system_lib
-)
+    INCLUDE_DIRS include
+    LIBRARIES blinker_tracking
+    CATKIN_DEPENDS cv_bridge image_transport message_runtime roscpp rospy sensor_msgs std_msgs
+    DEPENDS system_lib
+    )
 
 ###########
 ## Build ##

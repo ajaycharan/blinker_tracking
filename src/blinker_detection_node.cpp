@@ -13,8 +13,6 @@ bool is_init = 0;
 
 // parameters
 cv::SimpleBlobDetector::Params params;
-int maxval = 255;
-int threshold = 128;
 
 void callback(const sensor_msgs::Image::ConstPtr &msg)
 {
@@ -33,10 +31,6 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     cv::Mat diff;
     cv::absdiff(I->image, I_0->image, diff);
 
-    // // threshold differences
-    // cv::Mat res;
-    // cv::threshold(diff, res, threshold, maxval, cv::THRESH_BINARY);
-    
     ////////////////////////// detect blobs //////////////////////////
 
     // keypoints
@@ -47,7 +41,6 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
 
     // detect
     detector->detect(diff, keypoints);
-    // ROS_INFO("Number of Keypoints: %d", (int) keypoints.size());
 
     // results
     cv::Mat res;
@@ -65,6 +58,8 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     out.image = res;
     pub.publish(out.toImageMsg());
 
+    // publish keypoints
+
     // save last
     I_0 = I;
 
@@ -76,10 +71,13 @@ int main(int argc, char *argv[])
     ros::NodeHandle nh("~");
     image_transport::ImageTransport it(nh);
 
+    int blobColor;
+
     // parameters
     nh.param(std::string("minThreshold"),        params.minThreshold,        (float) 128);
     nh.param(std::string("maxThreshold"),        params.maxThreshold,        (float) 255);
     nh.param(std::string("filterByColor"),       params.filterByColor,       true);
+    nh.param(std::string("blobColor"),           blobColor,                  255);
     nh.param(std::string("filterByArea"),        params.filterByArea,        false);
     nh.param(std::string("minArea"),             params.minArea,             (float) 500);
     nh.param(std::string("maxArea"),             params.maxArea,             (float) 1000);
@@ -91,7 +89,7 @@ int main(int argc, char *argv[])
     nh.param(std::string("minInertiaRatio"),     params.minInertiaRatio,     (float) 0.2);
     nh.param(std::string("minDistBetweenBlobs"), params.minDistBetweenBlobs, (float) 100);
 
-    params.blobColor = 255;
+    params.blobColor = blobColor;
 
     ros::Subscriber sub;
     sub = nh.subscribe("image_raw", 10, &callback);
