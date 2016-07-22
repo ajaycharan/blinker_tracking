@@ -1,11 +1,14 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
+#include <blinker_tracking/KeyPoint.h>
+#include <blinker_tracking/KeyPointArray.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.hpp>
 #include <vector>
 
-image_transport::Publisher pub;
+image_transport::Publisher event_image_pub;
+ros::Publisher candidate_pub;
 
 // initializers
 cv_bridge::CvImagePtr I_0;
@@ -56,9 +59,20 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     cv_bridge::CvImage out;
     out.encoding = std::string("bgr8");
     out.image = res;
-    pub.publish(out.toImageMsg());
+    event_image_pub.publish(out.toImageMsg());
 
     // publish keypoints
+    blinker_tracking::KeyPointArray kps_msg;
+    for (int i = 0; i < keypoints.size(); i++)
+    {
+        blinker_tracking::KeyPoint kp_msg;
+        kp_msg.x = keypoints[i].pt.x;
+        kp_msg.y = keypoints[i].pt.y;
+        kp_msg.theta = keypoints[i].angle;
+        kp_msg.size = keypoints[i].size;
+        kps_msg.keypoints.push_back(kp_msg);
+    }
+    candidate_pub.publish(kps_msg);
 
     // save last
     I_0 = I;
@@ -94,7 +108,8 @@ int main(int argc, char *argv[])
     ros::Subscriber sub;
     sub = nh.subscribe("image_raw", 10, &callback);
 
-    pub = it.advertise("image_out", 1);
+    event_image_pub = it.advertise("image_out", 1);
+    candidate_pub = nh.advertise<blinker_tracking::KeyPointArray>("candidates", 5);
 
     ros::spin();
     return 0;
