@@ -1,5 +1,13 @@
 <launch>
 
+    <node pkg="image_view" type="image_view" name="image_view_raw">
+        <remap from="image" to="/sync/cam0/image_raw" />
+    </node>
+
+    <node pkg="image_view" type="image_view" name="image_view_detection">
+        <remap from="image" to="/blinker_detection_node/image_out" />
+    </node>
+
     <node name="blinker_detection_node" pkg="blinker_tracking" type="blinker_detection_node" output="screen">
         <remap from="~image_raw" to="/sync/cam0/image_raw"/>
         <param name="minThreshold" value="128" />
