@@ -5,7 +5,9 @@
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.hpp>
+
 #include <vector>
+#include <boost/algorithm/cxx11/is_sorted.hpp>
 
 image_transport::Publisher event_image_pub;
 ros::Publisher candidate_pub;
@@ -23,6 +25,11 @@ struct Center
     double radius;
     double confidence;
 };
+
+bool is_gte(Center x, Center y)
+{
+    return x.radius <= y.radius;
+}
 
 void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
 {
@@ -135,8 +142,8 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
     // initialize centers - contains blob centers at each threshold level
     std::vector < std::vector<Center> > centers;
 
-    // for each level of thresholding
-    for (double thresh = params.minThreshold; thresh < params.maxThreshold; thresh += params.thresholdStep)
+    // for each level of thresholding from maxThreshold down to minThreshold
+    for (double thresh = params.maxThreshold; thresh > params.minThreshold; thresh -= params.thresholdStep)
     {
 
         // threshold
@@ -180,24 +187,6 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
                     //      tracks the blob accross levels
                     centers[j].push_back(curCenters[i]);
 
-                    // let k be the index of the last observation of blob j
-                    //      within its row
-                    size_t k = centers[j].size() - 1;
-
-                    // shift previous observations up such that the newest
-                    //      observation is placed in the position which preserves
-                    //      nondecreasing order of radii within a row
-                    while( k > 0 && centers[j][k].radius < centers[j][k-1].radius )
-                    {
-                        centers[j][k] = centers[j][k-1];
-                        k--;
-                    }
-
-                    // place newest observation of blob j in its approprate
-                    //      position within its row which preserves
-                    //      nondecreasing order of radii
-                    centers[j][k] = curCenters[i];
-
                     // after the correspondence is detected and processed
                     //      continue with the next blob found in the current
                     //      level of thresholding
@@ -221,8 +210,13 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
     for (size_t i = 0; i < centers.size(); i++)
     {
 
+        // if the radii of each blob is not monotonically increasing across
+        //      threshold levels then skip
+        if (!boost::algorithm::is_sorted(centers[i].begin(), centers[i].end(), is_gte))
+            continue;
+
         // if the blob has not persisted across enough levels of thresholding
-        //      then process next
+        //      then skip
         if (centers[i].size() < params.minRepeatability)
             continue;
 

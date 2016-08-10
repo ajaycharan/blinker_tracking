@@ -17,6 +17,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
+find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
@@ -130,9 +131,11 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
-  ${catkin_INCLUDE_DIRS}
-  ${OpenCV_INCLUDE_DIRS}
-)
+    include
+    ${catkin_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
+    ${Boost_INCLUDE_DIRS}
+    )
 
 ## Declare a C++ library
 # add_library(blinker_tracking
@@ -166,6 +169,7 @@ add_dependencies(blinker_detection_node
 target_link_libraries(blinker_detection_node
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
 )
 
 #############
