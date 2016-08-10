@@ -289,31 +289,67 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
 
 }
 
+void loadOpenCVDefaults()
+{
+    params.thresholdStep = 10;
+    params.minThreshold = 50;
+    params.maxThreshold = 220;
+    params.minRepeatability = 2;
+    params.minDistBetweenBlobs = 10;
+
+    params.filterByColor = true;
+    params.blobColor = 0;
+
+    params.filterByArea = true;
+    params.minArea = 25;
+    params.maxArea = 5000;
+
+    params.filterByCircularity = false;
+    params.minCircularity = 0.8f;
+    params.maxCircularity = std::numeric_limits<float>::max();
+
+    params.filterByInertia = true;
+    // params.minInertiaRatio = 0.6;
+    params.minInertiaRatio = 0.1f;
+    params.maxInertiaRatio = std::numeric_limits<float>::max();
+
+    params.filterByConvexity = true;
+    // params.minConvexity = 0.8;
+    params.minConvexity = 0.95f;
+    params.maxConvexity = std::numeric_limits<float>::max();
+}
+
 int main(int argc, char *argv[])
 {
     ros::init(argc, argv, "blinker_detection_node");
     ros::NodeHandle nh("~");
     image_transport::ImageTransport it(nh);
 
-    int blobColor;
+    loadOpenCVDefaults();
 
     // parameters
-    nh.param(std::string("minThreshold"),        params.minThreshold,        (float) 128);
-    nh.param(std::string("maxThreshold"),        params.maxThreshold,        (float) 255);
-    nh.param(std::string("filterByColor"),       params.filterByColor,       true);
-    nh.param(std::string("blobColor"),           blobColor,                  255);
-    nh.param(std::string("filterByArea"),        params.filterByArea,        false);
-    nh.param(std::string("minArea"),             params.minArea,             (float) 500);
-    nh.param(std::string("maxArea"),             params.maxArea,             (float) 1000);
-    nh.param(std::string("filterByCircularity"), params.filterByCircularity, false);
-    nh.param(std::string("minCircularity"),      params.minCircularity,      (float) 0.5);
-    nh.param(std::string("filterByConvexity"),   params.filterByConvexity,   false);
-    nh.param(std::string("minConvexity"),        params.minConvexity,        (float) 0.4);
-    nh.param(std::string("filterByInertia"),     params.filterByInertia,     false);
-    nh.param(std::string("minInertiaRatio"),     params.minInertiaRatio,     (float) 0.2);
-    nh.param(std::string("minDistBetweenBlobs"), params.minDistBetweenBlobs, (float) 100);
+    nh.param(std::string("thresholdStep"),          params.thresholdStep,       (float) 10);
+    nh.param(std::string("minThreshold"),           params.minThreshold,        (float) 128);
+    nh.param(std::string("maxThreshold"),           params.maxThreshold,        (float) 255);
 
-    params.blobColor = blobColor;
+    int blobColor;
+    nh.param(std::string("filterByColor"),          params.filterByColor,       true);
+    nh.param(std::string("blobColor"),              blobColor,                  255);
+    params.blobColor = (unsigned char) blobColor;
+
+    nh.param(std::string("filterByArea"),           params.filterByArea,        false);
+    nh.param(std::string("minArea"),                params.minArea,             (float) 500);
+    nh.param(std::string("maxArea"),                params.maxArea,             (float) 1000);
+
+    nh.param(std::string("filterByCircularity"),    params.filterByCircularity, false);
+    nh.param(std::string("minCircularity"),         params.minCircularity,      (float) 0.5);
+
+    nh.param(std::string("filterByConvexity"),      params.filterByConvexity,   false);
+    nh.param(std::string("minConvexity"),           params.minConvexity,        (float) 0.4);
+
+    nh.param(std::string("filterByInertia"),        params.filterByInertia,     false);
+    nh.param(std::string("minInertiaRatio"),        params.minInertiaRatio,     (float) 0.2);
+    nh.param(std::string("minDistBetweenBlobs"),    params.minDistBetweenBlobs, (float) 100);
 
     ros::Subscriber sub;
     sub = nh.subscribe("image_raw", 10, &callback);
