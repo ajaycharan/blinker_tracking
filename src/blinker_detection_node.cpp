@@ -217,10 +217,16 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
         std::copy(newCenters.begin(), newCenters.end(), std::back_inserter(centers));
     }
 
+    // for each blob
     for (size_t i = 0; i < centers.size(); i++)
     {
+
+        // if the blob has not persisted across enough levels of thresholding
+        //      then process next
         if (centers[i].size() < params.minRepeatability)
             continue;
+
+        // compute the "average" center of blob across the observed levels
         cv::Point2d sumPoint(0, 0);
         double normalizer = 0;
         for (size_t j = 0; j < centers[i].size(); j++)
@@ -229,6 +235,8 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
             normalizer += centers[i][j].confidence;
         }
         sumPoint *= (1. / normalizer);
+
+        // convert the center to a keypoint and append it to the list
         cv::KeyPoint kpt(sumPoint, (float)(centers[i][centers[i].size() / 2].radius) * 2.0f);
         keypoints.push_back(kpt);
     }
@@ -333,7 +341,7 @@ int main(int argc, char *argv[])
     nh.param(std::string("maxThreshold"),           params.maxThreshold,        (float) 255);
 
     int blobColor;
-    nh.param(std::string("filterByColor"),          params.filterByColor,       true);
+    nh.param(std::string("filterByColor"),          params.filterByColor,       false);
     nh.param(std::string("blobColor"),              blobColor,                  255);
     params.blobColor = (unsigned char) blobColor;
 
