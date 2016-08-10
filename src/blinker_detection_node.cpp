@@ -17,30 +17,28 @@ bool is_init = 0;
 // parameters
 cv::SimpleBlobDetector::Params params;
 
-using namespace cv;
-
 struct Center
 {
-    Point2d location;
+    cv::Point2d location;
     double radius;
     double confidence;
 };
 
-void findBlobs(InputArray _image, InputArray _binaryImage, std::vector<Center> &centers)
+void findBlobs(cv::InputArray _image, cv::InputArray _binaryImage, std::vector<Center> &centers)
 {
-    Mat image = _image.getMat(), binaryImage = _binaryImage.getMat();
+    cv::Mat image = _image.getMat(), binaryImage = _binaryImage.getMat();
     (void)image;
     centers.clear();
 
-    std::vector < std::vector<Point> > contours;
-    Mat tmpBinaryImage = binaryImage.clone();
-    findContours(tmpBinaryImage, contours, RETR_LIST, CHAIN_APPROX_NONE);
+    std::vector < std::vector<cv::Point> > contours;
+    cv::Mat tmpBinaryImage = binaryImage.clone();
+    cv::findContours(tmpBinaryImage, contours, cv::RETR_LIST, cv::CHAIN_APPROX_NONE);
 
     for (size_t contourIdx = 0; contourIdx < contours.size(); contourIdx++)
     {
         Center center;
         center.confidence = 1;
-        Moments moms = moments(Mat(contours[contourIdx]));
+        cv::Moments moms = cv::moments(cv::Mat(contours[contourIdx]));
         if (params.filterByArea)
         {
             double area = moms.m00;
@@ -51,7 +49,7 @@ void findBlobs(InputArray _image, InputArray _binaryImage, std::vector<Center> &
         if (params.filterByCircularity)
         {
             double area = moms.m00;
-            double perimeter = arcLength(Mat(contours[contourIdx]), true);
+            double perimeter = cv::arcLength(cv::Mat(contours[contourIdx]), true);
             double ratio = 4 * CV_PI * area / (perimeter * perimeter);
             if (ratio < params.minCircularity || ratio >= params.maxCircularity)
                 continue;
@@ -86,10 +84,10 @@ void findBlobs(InputArray _image, InputArray _binaryImage, std::vector<Center> &
 
         if (params.filterByConvexity)
         {
-            std::vector < Point > hull;
-            convexHull(Mat(contours[contourIdx]), hull);
-            double area = contourArea(Mat(contours[contourIdx]));
-            double hullArea = contourArea(Mat(hull));
+            std::vector < cv::Point > hull;
+            cv::convexHull(cv::Mat(contours[contourIdx]), hull);
+            double area = cv::contourArea(cv::Mat(contours[contourIdx]));
+            double hullArea = cv::contourArea(cv::Mat(hull));
             double ratio = area / hullArea;
             if (ratio < params.minConvexity || ratio >= params.maxConvexity)
                 continue;
@@ -97,7 +95,7 @@ void findBlobs(InputArray _image, InputArray _binaryImage, std::vector<Center> &
 
         if(moms.m00 == 0.0)
             continue;
-        center.location = Point2d(moms.m10 / moms.m00, moms.m01 / moms.m00);
+        center.location = cv::Point2d(moms.m10 / moms.m00, moms.m01 / moms.m00);
 
         if (params.filterByColor)
         {
@@ -110,8 +108,8 @@ void findBlobs(InputArray _image, InputArray _binaryImage, std::vector<Center> &
             std::vector<double> dists;
             for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
             {
-                Point2d pt = contours[contourIdx][pointIdx];
-                dists.push_back(norm(center.location - pt));
+                cv::Point2d pt = contours[contourIdx][pointIdx];
+                dists.push_back(cv::norm(center.location - pt));
             }
             std::sort(dists.begin(), dists.end());
             center.radius = (dists[(dists.size() - 1) / 2] + dists[dists.size() / 2]) / 2.;
@@ -127,21 +125,21 @@ void detect(cv::InputArray image,
 {
     //TODO: support mask
     keypoints.clear();
-    Mat grayscaleImage;
+    cv::Mat grayscaleImage;
     if (image.channels() == 3)
-        cvtColor(image, grayscaleImage, COLOR_BGR2GRAY);
+        cv::cvtColor(image, grayscaleImage, cv::COLOR_BGR2GRAY);
     else
         grayscaleImage = image.getMat();
 
     if (grayscaleImage.type() != CV_8UC1) {
-        CV_Error(Error::StsUnsupportedFormat, "Blob detector only supports 8-bit images!");
+        CV_Error(cv::Error::StsUnsupportedFormat, "Blob detector only supports 8-bit images!");
     }
 
     std::vector < std::vector<Center> > centers;
     for (double thresh = params.minThreshold; thresh < params.maxThreshold; thresh += params.thresholdStep)
     {
-        Mat binarizedImage;
-        threshold(grayscaleImage, binarizedImage, thresh, 255, THRESH_BINARY);
+        cv::Mat binarizedImage;
+        cv::threshold(grayscaleImage, binarizedImage, thresh, 255, cv::THRESH_BINARY);
 
         std::vector < Center > curCenters;
         findBlobs(grayscaleImage, binarizedImage, curCenters);
@@ -178,7 +176,7 @@ void detect(cv::InputArray image,
     {
         if (centers[i].size() < params.minRepeatability)
             continue;
-        Point2d sumPoint(0, 0);
+        cv::Point2d sumPoint(0, 0);
         double normalizer = 0;
         for (size_t j = 0; j < centers[i].size(); j++)
         {
@@ -186,7 +184,7 @@ void detect(cv::InputArray image,
             normalizer += centers[i][j].confidence;
         }
         sumPoint *= (1. / normalizer);
-        KeyPoint kpt(sumPoint, (float)(centers[i][centers[i].size() / 2].radius) * 2.0f);
+        cv::KeyPoint kpt(sumPoint, (float)(centers[i][centers[i].size() / 2].radius) * 2.0f);
         keypoints.push_back(kpt);
     }
 }
