@@ -24,10 +24,9 @@ struct Center
     double confidence;
 };
 
-void findBlobs(cv::InputArray _image, cv::InputArray _binaryImage, std::vector<Center> &centers)
+void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
 {
-    cv::Mat image = _image.getMat(), binaryImage = _binaryImage.getMat();
-    (void)image;
+    cv::Mat binaryImage = _binaryImage.getMat();
     centers.clear();
 
     std::vector < std::vector<cv::Point> > contours;
@@ -119,11 +118,9 @@ void findBlobs(cv::InputArray _image, cv::InputArray _binaryImage, std::vector<C
     }
 }
 
-void detect(cv::InputArray image, 
-        std::vector<cv::KeyPoint>& keypoints, 
-        const cv::SimpleBlobDetector::Params& params)
+void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
 {
-    //TODO: support mask
+    // clean up input
     keypoints.clear();
     cv::Mat grayscaleImage;
     if (image.channels() == 3)
@@ -135,40 +132,88 @@ void detect(cv::InputArray image,
         CV_Error(cv::Error::StsUnsupportedFormat, "Blob detector only supports 8-bit images!");
     }
 
+    // initialize centers - contains blob centers at each threshold level
     std::vector < std::vector<Center> > centers;
+
+    // for each level of thresholding
     for (double thresh = params.minThreshold; thresh < params.maxThreshold; thresh += params.thresholdStep)
     {
+
+        // threshold
         cv::Mat binarizedImage;
         cv::threshold(grayscaleImage, binarizedImage, thresh, 255, cv::THRESH_BINARY);
 
+        // find blobs at current threshold level
         std::vector < Center > curCenters;
-        findBlobs(grayscaleImage, binarizedImage, curCenters);
+        findBlobs(binarizedImage, curCenters);
+
+        // for each blob found at the current level
         std::vector < std::vector<Center> > newCenters;
         for (size_t i = 0; i < curCenters.size(); i++)
         {
+
+            // assume that it is newly seen
             bool isNew = true;
+
+            // for the blobs at each level of thresholding
             for (size_t j = 0; j < centers.size(); j++)
             {
+
+                // compute euclidean distance between current blob i and
+                //      every other blob within the last half of all levels
+                //      NOTE: it would be unlikely for a blob to exist in the
+                //      first few levels, disappear, then reappear. Searching
+                //      the last half speeds up computation
                 double dist = norm(centers[j][ centers[j].size() / 2 ].location - curCenters[i].location);
-                isNew = dist >= params.minDistBetweenBlobs && dist >= centers[j][ centers[j].size() / 2 ].radius && dist >= curCenters[i].radius;
+
+                // check for correspondence between blob i and blob j
+                isNew = dist >= params.minDistBetweenBlobs && \
+                        dist >= centers[j][ centers[j].size() / 2 ].radius && \
+                        dist >= curCenters[i].radius;
+
+                // if correspondence is detected between blob i and blob j
                 if (!isNew)
                 {
+
+                    // append the new instance of blob j found at the current
+                    //      level to its parent list (row of centers) which
+                    //      tracks the blob accross levels
                     centers[j].push_back(curCenters[i]);
 
+                    // let k be the index of the last observation of blob j
+                    //      within its row
                     size_t k = centers[j].size() - 1;
+
+                    // shift previous observations up such that the newest
+                    //      observation is placed in the position which preserves
+                    //      nondecreasing order of radii within a row
                     while( k > 0 && centers[j][k].radius < centers[j][k-1].radius )
                     {
                         centers[j][k] = centers[j][k-1];
                         k--;
                     }
+
+                    // place newest observation of blob j in its approprate
+                    //      position within its row which preserves
+                    //      nondecreasing order of radii
                     centers[j][k] = curCenters[i];
 
+                    // after the correspondence is detected and processed
+                    //      continue with the next blob found in the current
+                    //      level of thresholding
                     break;
                 }
             }
+
+            // if the blob found in the current level is new
             if (isNew)
+
+                // append a new list of centers initialized with blob j
+                //      seen at the current level
                 newCenters.push_back(std::vector<Center> (1, curCenters[i]));
         }
+
+        // vertically stack newCenters and centers (append new unique blobs)
         std::copy(newCenters.begin(), newCenters.end(), std::back_inserter(centers));
     }
 
@@ -208,7 +253,7 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     std::vector<cv::KeyPoint> keypoints;
 
     // detect
-    detect(I->image, keypoints, params);
+    detect(I->image, keypoints);
 
     // results
     cv::Mat res;
