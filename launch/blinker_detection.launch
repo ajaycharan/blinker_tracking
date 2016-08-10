@@ -12,7 +12,7 @@
         <remap from="~image_raw" to="/sync/cam0/image_raw"/>
         <param name="minThreshold" value="128" />
         <param name="maxThreshold" value="255" />       
-        <param name="filterByColor" value="true" />
+        <param name="filterByColor" value="false" />
         <param name="filterByArea" value="true" />
         <param name="maxArea" value="200" />
         <param name="minArea" value="15" />
