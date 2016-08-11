@@ -12,24 +12,56 @@
 image_transport::Publisher event_image_pub;
 ros::Publisher candidate_pub;
 
-// initializers
-cv_bridge::CvImagePtr I_0;
+// globals
 bool is_init = 0;
-
-// parameters
+float areaWeight;
+float circularityWeight;
+float confidenceWeight;
+float peakRiseThreshold;
 cv::SimpleBlobDetector::Params params;
 
-struct Center
+cv_bridge::CvImagePtr I_0;
+cv::Mat prev_descriptors;
+
+struct Blob
 {
     cv::Point2d location;
     double radius;
     double confidence;
+
+    double area;
+    double circularity;
 };
 
-void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
+void detectPeakRise(
+        cv::Mat descriptors,
+        cv::Mat prev_descriptors,
+        std::vector<cv::KeyPoint>& peaks,
+        std::vector<cv::KeyPoint>& candidates)
+{
+
+    // match similar peaks across frames
+    cv::FlannBasedMatcher matcher;
+    std::vector< std::vector<cv::DMatch> > matches;
+    matcher.knnMatch(descriptors, prev_descriptors, matches, 1);
+
+    // for each peak
+    for (int i = 0; i < matches.size(); i++)
+    {
+        if (matches[i][0].distance > peakRiseThreshold)
+        {
+            candidates.push_back(peaks[matches[i][0].queryIdx]);
+            std::cout << matches[i][0].queryIdx << std::endl;
+        }
+    }
+
+}
+
+
+void findBlobs(cv::InputArray _binaryImage, std::vector<Blob> &blobs)
 {
     cv::Mat binaryImage = _binaryImage.getMat();
-    centers.clear();
+    blobs.clear();
 
     std::vector < std::vector<cv::Point> > contours;
     cv::Mat tmpBinaryImage = binaryImage.clone();
@@ -37,14 +69,17 @@ void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
 
     for (size_t contourIdx = 0; contourIdx < contours.size(); contourIdx++)
     {
-        Center center;
-        center.confidence = 1;
+        Blob blob;
+        blob.area = 1;
+        blob.circularity = 1;
+        blob.confidence = 1;
         cv::Moments moms = cv::moments(cv::Mat(contours[contourIdx]));
         if (params.filterByArea)
         {
             double area = moms.m00;
             if (area < params.minArea || area >= params.maxArea)
                 continue;
+            blob.area = area;
         }
 
         if (params.filterByCircularity)
@@ -54,6 +89,7 @@ void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
             double ratio = 4 * CV_PI * area / (perimeter * perimeter);
             if (ratio < params.minCircularity || ratio >= params.maxCircularity)
                 continue;
+            blob.circularity = ratio;
         }
 
         if (params.filterByInertia)
@@ -80,7 +116,7 @@ void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
             if (ratio < params.minInertiaRatio || ratio >= params.maxInertiaRatio)
                 continue;
 
-            center.confidence = ratio * ratio;
+            blob.confidence = ratio * ratio;
         }
 
         if (params.filterByConvexity)
@@ -96,11 +132,11 @@ void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
 
         if(moms.m00 == 0.0)
             continue;
-        center.location = cv::Point2d(moms.m10 / moms.m00, moms.m01 / moms.m00);
+        blob.location = cv::Point2d(moms.m10 / moms.m00, moms.m01 / moms.m00);
 
         if (params.filterByColor)
         {
-            if (binaryImage.at<uchar> (cvRound(center.location.y), cvRound(center.location.x)) != params.blobColor)
+            if (binaryImage.at<uchar> (cvRound(blob.location.y), cvRound(blob.location.x)) != params.blobColor)
                 continue;
         }
 
@@ -110,17 +146,17 @@ void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
             for (size_t pointIdx = 0; pointIdx < contours[contourIdx].size(); pointIdx++)
             {
                 cv::Point2d pt = contours[contourIdx][pointIdx];
-                dists.push_back(cv::norm(center.location - pt));
+                dists.push_back(cv::norm(blob.location - pt));
             }
             std::sort(dists.begin(), dists.end());
-            center.radius = (dists[(dists.size() - 1) / 2] + dists[dists.size() / 2]) / 2.;
+            blob.radius = (dists[(dists.size() - 1) / 2] + dists[dists.size() / 2]) / 2.;
         }
 
-        centers.push_back(center);
+        blobs.push_back(blob);
     }
 }
 
-void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
+void findPeaks(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors)
 {
     // clean up input
     keypoints.clear();
@@ -134,8 +170,8 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
         CV_Error(cv::Error::StsUnsupportedFormat, "Blob detector only supports 8-bit images!");
     }
 
-    // initialize centers - contains blob centers at each threshold level
-    std::vector < std::vector<Center> > centers;
+    // initialize blobs - i : blob; j : levels
+    std::vector < std::vector<Blob> > blobs;
 
     // for each level of thresholding from maxThreshold down to minThreshold
     for (double thresh = params.maxThreshold; thresh > params.minThreshold; thresh -= params.thresholdStep)
@@ -146,57 +182,57 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
         cv::threshold(grayscaleImage, binarizedImage, thresh, 255, cv::THRESH_BINARY);
 
         // find blobs at current threshold level
-        std::vector < Center > curCenters;
-        findBlobs(binarizedImage, curCenters);
+        std::vector < Blob > curBlobs;
+        findBlobs(binarizedImage, curBlobs);
 
         // for each blob found at the current level
-        std::vector < std::vector<Center> > newCenters;
-        for (size_t i = 0; i < curCenters.size(); i++)
+        std::vector < std::vector<Blob> > newBlobs;
+        for (size_t i = 0; i < curBlobs.size(); i++)
         {
 
             // assume that it is newly seen
             bool isNew = true;
 
             // for the blobs at each level of thresholding
-            for (size_t j = 0; j < centers.size(); j++)
+            for (size_t j = 0; j < blobs.size(); j++)
             {
 
                 // compute euclidean distance between current blob i and
                 //      every other blob -- choosing the blob observation 
                 //      with the median radius
-                double dist = norm(centers[j][ centers[j].size() / 2 ].location - curCenters[i].location);
+                double dist = norm(blobs[j][ blobs[j].size() / 2 ].location - curBlobs[i].location);
 
                 // check for correspondence between blob i and blob j
                 isNew = dist >= params.minDistBetweenBlobs && \
-                        dist >= centers[j][ centers[j].size() / 2 ].radius && \
-                        dist >= curCenters[i].radius;
+                        dist >= blobs[j][ blobs[j].size() / 2 ].radius && \
+                        dist >= curBlobs[i].radius;
 
                 // if correspondence is detected between blob i and blob j
                 if (!isNew)
                 {
 
                     // append the new instance of blob j found at the current
-                    //      level to its parent list (row of centers) which
+                    //      level to its parent list which
                     //      tracks the blob accross levels
-                    centers[j].push_back(curCenters[i]);
+                    blobs[j].push_back(curBlobs[i]);
 
                     // let k be the index of the last observation of blob j
                     //      within its row
-                    size_t k = centers[j].size() - 1;
+                    size_t k = blobs[j].size() - 1;
 
                     // shift previous observations up such that the newest
                     //      observation is placed in the position which preserves
                     //      nondecreasing order of radii within a row
-                    while( k > 0 && centers[j][k].radius < centers[j][k-1].radius )
+                    while( k > 0 && blobs[j][k].radius < blobs[j][k-1].radius )
                     {
-                        centers[j][k] = centers[j][k-1];
+                        blobs[j][k] = blobs[j][k-1];
                         k--;
                     }
 
                     // place newest observation of blob j in its approprate
                     //      position within its row which preserves
                     //      nondecreasing order of radii
-                    centers[j][k] = curCenters[i];
+                    blobs[j][k] = curBlobs[i];
 
                     // after the correspondence is detected and processed
                     //      continue with the next blob found in the current
@@ -208,92 +244,127 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
             // if the blob found in the current level is new
             if (isNew)
 
-                // append a new list of centers initialized with blob j
+                // append a new list of blobs initialized with blob j
                 //      seen at the current level
-                newCenters.push_back(std::vector<Center> (1, curCenters[i]));
+                newBlobs.push_back(std::vector<Blob> (1, curBlobs[i]));
         }
 
-        // vertically stack newCenters and centers (append new unique blobs)
-        std::copy(newCenters.begin(), newCenters.end(), std::back_inserter(centers));
+        // vertically stack newBlobs and blobs (append new unique blobs)
+        std::copy(newBlobs.begin(), newBlobs.end(), std::back_inserter(blobs));
     }
 
+    // reset descriptor array
+    descriptors = cv::Mat();
+
     // for each blob
-    for (size_t i = 0; i < centers.size(); i++)
+    for (size_t i = 0; i < blobs.size(); i++)
     {
 
         // if the blob has not persisted across enough levels of thresholding
         //      then skip
-        if (centers[i].size() < params.minRepeatability)
+        if (blobs[i].size() < params.minRepeatability)
             continue;
 
         // compute the "average" center of blob across the observed levels
         cv::Point2d sumPoint(0, 0);
         double normalizer = 0;
-        for (size_t j = 0; j < centers[i].size(); j++)
+        for (size_t j = 0; j < blobs[i].size(); j++)
         {
-            sumPoint += centers[i][j].confidence * centers[i][j].location;
-            normalizer += centers[i][j].confidence;
+            sumPoint += blobs[i][j].confidence * blobs[i][j].location;
+            normalizer += blobs[i][j].confidence;
         }
         sumPoint *= (1. / normalizer);
 
-        // convert the center to a keypoint and append it to the list
-        cv::KeyPoint kpt(sumPoint, (float)(centers[i][centers[i].size() / 2].radius) * 2.0f);
+        // convert the blob to a keypoint and append it to the list
+        cv::KeyPoint kpt(sumPoint, (float)(blobs[i][blobs[i].size() / 2].radius) * 2.0f);
         keypoints.push_back(kpt);
+
+        // blob feature vector
+        cv::Mat row = cv::Mat::zeros(1, 5, CV_32F);
+        row.at<float>(0) = sumPoint.x;
+        row.at<float>(1) = sumPoint.y;
+        row.at<float>(2) =
+            (float) blobs[i][blobs[i].size() / 2].area * areaWeight;
+        row.at<float>(3) =
+            (float) blobs[i][blobs[i].size() / 2].circularity * circularityWeight;
+        row.at<float>(4) =
+            (float) blobs[i][blobs[i].size() / 2].confidence * confidenceWeight;
+        descriptors.push_back(row);
+
+
     }
 }
 
 void callback(const sensor_msgs::Image::ConstPtr &msg)
 {
 
+    // extract input
+    cv_bridge::CvImagePtr I;
+    I = cv_bridge::toCvCopy(msg);
+
+    // peaks
+    std::vector<cv::KeyPoint> peaks;
+    cv::Mat descriptors;
+
+    // find peaks
+    findPeaks(I->image, peaks, descriptors);
+
+    // sanity
+    std::cout << descriptors << std::endl;
+
+    // results
+    cv::Mat res_1;
+    cv::drawKeypoints(I->image, 
+            peaks, 
+            res_1, 
+            cv::Scalar(0, 0, 255), 
+            cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+    // save data and return if this is the first call
     if (!is_init)
     {
-        I_0 = cv_bridge::toCvCopy(msg);
+        I_0 = I;
+        prev_descriptors = descriptors;
         is_init = 1;
         return;
     }
 
-    cv_bridge::CvImagePtr I;
-    I = cv_bridge::toCvCopy(msg);
-
-    ////////////////////////// detect blobs //////////////////////////
-
-    // keypoints
-    std::vector<cv::KeyPoint> keypoints;
-
-    // detect
-    detect(I->image, keypoints);
+    // find peaks not seen in the last frame for blinker candidates
+    std::vector<cv::KeyPoint> candidates;
+    detectPeakRise(descriptors, prev_descriptors, peaks, candidates);
 
     // results
-    cv::Mat res;
-    cv::drawKeypoints(I->image, 
-            keypoints, 
-            res, 
-            cv::Scalar(0, 0, 255), 
+    cv::Mat res_2;
+    cv::drawKeypoints(res_1, 
+            candidates, 
+            res_2, 
+            cv::Scalar(255, 0, 0), 
             cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-
-    ///////////////////////////////////////////////////////////////////
 
     // publish result
     cv_bridge::CvImage out;
     out.encoding = std::string("bgr8");
-    out.image = res;
+    out.image = res_2;
     event_image_pub.publish(out.toImageMsg());
 
     // publish keypoints
-    blinker_tracking::KeyPointArray kps_msg;
-    for (int i = 0; i < keypoints.size(); i++)
-    {
-        blinker_tracking::KeyPoint kp_msg;
-        kp_msg.x = keypoints[i].pt.x;
-        kp_msg.y = keypoints[i].pt.y;
-        kp_msg.theta = keypoints[i].angle;
-        kp_msg.size = keypoints[i].size;
-        kps_msg.keypoints.push_back(kp_msg);
-    }
-    candidate_pub.publish(kps_msg);
+    // blinker_tracking::KeyPointArray kps_msg;
+    // for (int i = 0; i < keypoints.size(); i++)
+    // {
+    //     blinker_tracking::KeyPoint kp_msg;
+    //     kp_msg.x = keypoints[i].pt.x;
+    //     kp_msg.y = keypoints[i].pt.y;
+    //     kp_msg.theta = keypoints[i].angle;
+    //     kp_msg.size = keypoints[i].size;
+    //     kps_msg.keypoints.push_back(kp_msg);
+    // }
+    // candidate_pub.publish(kps_msg);
 
-    // save last
+    // save last frame
     I_0 = I;
+
+    // save last set of keypoints
+    prev_descriptors = descriptors;
 
 }
 
@@ -361,6 +432,11 @@ int main(int argc, char *argv[])
     nh.param(std::string("filterByInertia"),        params.filterByInertia,     false);
     nh.param(std::string("minInertiaRatio"),        params.minInertiaRatio,     (float) 0.2);
     nh.param(std::string("minDistBetweenBlobs"),    params.minDistBetweenBlobs, (float) 100);
+
+    nh.param(std::string("areaWeight"),             areaWeight,                 (float) 1.0);
+    nh.param(std::string("circularityWeight"),      circularityWeight,          (float) 1.0);
+    nh.param(std::string("confidenceWeight"),       confidenceWeight,           (float) 1.0);
+    nh.param(std::string("peakRiseThreshold"),      peakRiseThreshold,          (float) 100.0);
 
     ros::Subscriber sub;
     sub = nh.subscribe("image_raw", 10, &callback);
