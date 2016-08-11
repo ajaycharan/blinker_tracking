@@ -329,6 +329,11 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
         return;
     }
 
+    if (peaks.size() == 0)
+    {
+        return;
+    }
+
     // find peaks not seen in the last frame for blinker candidates
     std::vector<cv::KeyPoint> candidates;
     detectPeakRise(descriptors, prev_descriptors, peaks, candidates);
