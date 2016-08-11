@@ -22,8 +22,8 @@
         <param name="maxArea" value="300" />
         <param name="minArea" value="15" />
 
-        <param name="filterByCircularity" value="false" />
-        <param name="minCircularity" value="0.5" />
+        <param name="filterByCircularity" value="true" />
+        <param name="minCircularity" value="0.8" />
 
         <param name="filterByConvexity" value="false" />
         <param name="minConvexity" value="0.4" />
