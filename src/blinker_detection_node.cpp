@@ -26,11 +26,6 @@ struct Center
     double confidence;
 };
 
-bool is_gte(Center x, Center y)
-{
-    return x.radius <= y.radius;
-}
-
 void findBlobs(cv::InputArray _binaryImage, std::vector<Center> &centers)
 {
     cv::Mat binaryImage = _binaryImage.getMat();
@@ -167,10 +162,8 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
             {
 
                 // compute euclidean distance between current blob i and
-                //      every other blob within the last half of all levels
-                //      NOTE: it would be unlikely for a blob to exist in the
-                //      first few levels, disappear, then reappear. Searching
-                //      the last half speeds up computation
+                //      every other blob -- choosing the blob observation 
+                //      with the median radius
                 double dist = norm(centers[j][ centers[j].size() / 2 ].location - curCenters[i].location);
 
                 // check for correspondence between blob i and blob j
@@ -186,6 +179,24 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
                     //      level to its parent list (row of centers) which
                     //      tracks the blob accross levels
                     centers[j].push_back(curCenters[i]);
+
+                    // let k be the index of the last observation of blob j
+                    //      within its row
+                    size_t k = centers[j].size() - 1;
+
+                    // shift previous observations up such that the newest
+                    //      observation is placed in the position which preserves
+                    //      nondecreasing order of radii within a row
+                    while( k > 0 && centers[j][k].radius < centers[j][k-1].radius )
+                    {
+                        centers[j][k] = centers[j][k-1];
+                        k--;
+                    }
+
+                    // place newest observation of blob j in its approprate
+                    //      position within its row which preserves
+                    //      nondecreasing order of radii
+                    centers[j][k] = curCenters[i];
 
                     // after the correspondence is detected and processed
                     //      continue with the next blob found in the current
@@ -209,11 +220,6 @@ void detect(cv::InputArray image, std::vector<cv::KeyPoint>& keypoints)
     // for each blob
     for (size_t i = 0; i < centers.size(); i++)
     {
-
-        // if the radii of each blob is not monotonically increasing across
-        //      threshold levels then skip
-        if (!boost::algorithm::is_sorted(centers[i].begin(), centers[i].end(), is_gte))
-            continue;
 
         // if the blob has not persisted across enough levels of thresholding
         //      then skip
@@ -330,9 +336,12 @@ int main(int argc, char *argv[])
     loadOpenCVDefaults();
 
     // parameters
+    int minRepeatability;
     nh.param(std::string("thresholdStep"),          params.thresholdStep,       (float) 10);
     nh.param(std::string("minThreshold"),           params.minThreshold,        (float) 128);
     nh.param(std::string("maxThreshold"),           params.maxThreshold,        (float) 255);
+    nh.param(std::string("minRepeatability"),       minRepeatability,           (int) 2);
+    params.minRepeatability = (unsigned long int) minRepeatability;
 
     int blobColor;
     nh.param(std::string("filterByColor"),          params.filterByColor,       false);
@@ -340,8 +349,8 @@ int main(int argc, char *argv[])
     params.blobColor = (unsigned char) blobColor;
 
     nh.param(std::string("filterByArea"),           params.filterByArea,        false);
-    nh.param(std::string("minArea"),                params.minArea,             (float) 500);
-    nh.param(std::string("maxArea"),                params.maxArea,             (float) 1000);
+    nh.param(std::string("minArea"),                params.minArea,             (float) 25);
+    nh.param(std::string("maxArea"),                params.maxArea,             (float) 5000);
 
     nh.param(std::string("filterByCircularity"),    params.filterByCircularity, false);
     nh.param(std::string("minCircularity"),         params.minCircularity,      (float) 0.5);

@@ -1,8 +1,8 @@
 <launch>
 
-    <node pkg="image_view" type="image_view" name="image_view_raw">
+    <!-- <node pkg="image_view" type="image_view" name="image_view_raw">
         <remap from="image" to="/sync/cam0/image_raw" />
-    </node>
+    </node> -->
 
     <node pkg="image_view" type="image_view" name="image_view_detection">
         <remap from="image" to="/blinker_detection_node/image_out" />
@@ -10,19 +10,28 @@
 
     <node name="blinker_detection_node" pkg="blinker_tracking" type="blinker_detection_node" output="screen">
         <remap from="~image_raw" to="/sync/cam0/image_raw"/>
-        <param name="minThreshold" value="128" />
+
+        <param name="minThreshold" value="55" />
         <param name="maxThreshold" value="255" />       
+        <param name="minRepeatability" value="10" />       
+
         <param name="filterByColor" value="false" />
+        <param name="blobColor" value="255" />
+
         <param name="filterByArea" value="true" />
-        <param name="maxArea" value="200" />
+        <param name="maxArea" value="300" />
         <param name="minArea" value="15" />
+
         <param name="filterByCircularity" value="false" />
         <param name="minCircularity" value="0.5" />
+
         <param name="filterByConvexity" value="false" />
         <param name="minConvexity" value="0.4" />
-        <param name="filterByInertia" value="true" />
+
+        <param name="filterByInertia" value="false" />
         <param name="minInertiaRatio" value="0.3" />
-        <param name="minDistBetweenBlobs" value="30" />
+
+        <param name="minDistBetweenBlobs" value="5" />
     </node>
 
 </launch>
