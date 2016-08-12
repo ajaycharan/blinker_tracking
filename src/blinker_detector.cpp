@@ -353,6 +353,8 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
 
     // publish candidates
     blinker_tracking::BlobFeatureArray bfa;
+    bfa.header.seq = msg->header.seq;
+    bfa.header.stamp = msg->header.stamp;
     for (int i = 0; i < candidateIds.size(); i++)
     {
         blinker_tracking::BlobFeature bf;
@@ -402,7 +404,7 @@ void loadOpenCVDefaults()
 
 int main(int argc, char *argv[])
 {
-    ros::init(argc, argv, "blinker_detection_node");
+    ros::init(argc, argv, "blinker_detector");
     ros::NodeHandle nh("~");
     image_transport::ImageTransport it(nh);
 
