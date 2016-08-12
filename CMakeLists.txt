@@ -150,13 +150,13 @@ include_directories(
 ## Declare a C++ executable
 # add_executable(blinker_tracking_node src/blinker_tracking_node.cpp)
 
-add_executable(blinker_detection_node src/blinker_detection_node.cpp)
+add_executable(blinker_detector src/blinker_detector.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(blinker_tracking_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
-add_dependencies(blinker_detection_node 
+add_dependencies(blinker_detector 
     ${${PROJECT_NAME}_EXPORTED_TARGETS} 
     ${catkin_EXPORTED_TARGETS}
     )
@@ -166,7 +166,7 @@ add_dependencies(blinker_detection_node
 #   ${catkin_LIBRARIES}
 # )
 
-target_link_libraries(blinker_detection_node
+target_link_libraries(blinker_detector
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Boost_LIBRARIES}
