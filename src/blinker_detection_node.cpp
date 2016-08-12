@@ -20,7 +20,6 @@ float confidenceWeight;
 float peakRiseThreshold;
 cv::SimpleBlobDetector::Params params;
 
-cv_bridge::CvImagePtr I_0;
 cv::Mat prev_descriptors;
 
 struct Blob
@@ -38,6 +37,20 @@ void detectPeakRise(
         cv::Mat prev_descriptors,
         std::vector<int>& candidateIds)
 {
+    // check that something new has been detected in the frame
+    if (descriptors.rows == 0)
+        return;
+
+    // if there are no existing peaks in the last frame add all the new
+    //      peaks as candidates
+    if (prev_descriptors.rows == 0)
+    {
+        for(int i = 0; i < descriptors.rows; i++)
+        {
+            candidateIds.push_back(i);
+        }
+        return;
+    }
 
     // match similar peaks across frames
     cv::FlannBasedMatcher matcher;
@@ -308,14 +321,10 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     // save data and return if this is the first call
     if (!is_init)
     {
-        I_0 = I;
         prev_descriptors = descriptors;
         is_init = 1;
         return;
     }
-
-    if (peaks.size() == 0)
-        return;
 
     // find peaks not seen in the last frame
     std::vector<int> candidateIds;
@@ -345,13 +354,13 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
             cv::Scalar(255, 0, 0), 
             cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-    // publish result
+    // publish image with overlay
     cv_bridge::CvImage out;
     out.encoding = std::string("bgr8");
     out.image = res_2;
     event_image_pub.publish(out.toImageMsg());
 
-    // publish keypoints
+    // publish candidates
     blinker_tracking::BlobFeatureArray bfa;
     for (int i = 0; i < candidateIds.size(); i++)
     {
@@ -364,9 +373,6 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
         bfa.features.push_back(bf);
     }
     candidate_pub.publish(bfa);
-
-    // save last frame
-    I_0 = I;
 
     // save last set of keypoints
     prev_descriptors = descriptors;
@@ -444,7 +450,7 @@ int main(int argc, char *argv[])
     nh.param(std::string("peakRiseThreshold"),      peakRiseThreshold,          (float) 100.0);
 
     ros::Subscriber sub;
-    sub = nh.subscribe("image_raw", 10, &callback);
+    sub = nh.subscribe("image_raw", 30, &callback);
 
     event_image_pub = it.advertise("image_out", 1);
     candidate_pub = nh.advertise<blinker_tracking::BlobFeatureArray>("candidates", 5);
