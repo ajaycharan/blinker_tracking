@@ -1,7 +1,7 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
-#include <blinker_tracking/KeyPoint.h>
-#include <blinker_tracking/KeyPointArray.h>
+#include <blinker_tracking/BlobFeature.h>
+#include <blinker_tracking/BlobFeatureArray.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.hpp>
@@ -36,8 +36,7 @@ struct Blob
 void detectPeakRise(
         cv::Mat descriptors,
         cv::Mat prev_descriptors,
-        std::vector<cv::KeyPoint>& peaks,
-        std::vector<cv::KeyPoint>& candidates)
+        std::vector<int>& candidateIds)
 {
 
     // match similar peaks across frames
@@ -50,8 +49,7 @@ void detectPeakRise(
     {
         if (matches[i][0].distance > peakRiseThreshold)
         {
-            candidates.push_back(peaks[matches[i][0].queryIdx]);
-            std::cout << matches[i][0].queryIdx << std::endl;
+            candidateIds.push_back((int) matches[i][0].queryIdx);
         }
     }
 
@@ -302,23 +300,10 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     cv_bridge::CvImagePtr I;
     I = cv_bridge::toCvCopy(msg);
 
-    // peaks
+    // find peaks
     std::vector<cv::KeyPoint> peaks;
     cv::Mat descriptors;
-
-    // find peaks
     findPeaks(I->image, peaks, descriptors);
-
-    // sanity
-    std::cout << descriptors << std::endl;
-
-    // results
-    cv::Mat res_1;
-    cv::drawKeypoints(I->image, 
-            peaks, 
-            res_1, 
-            cv::Scalar(0, 0, 255), 
-            cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
     // save data and return if this is the first call
     if (!is_init)
@@ -330,15 +315,29 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     }
 
     if (peaks.size() == 0)
-    {
         return;
+
+    // find peaks not seen in the last frame
+    std::vector<int> candidateIds;
+    detectPeakRise(descriptors, prev_descriptors, candidateIds);
+
+    // convert to list of keypoints for plotting
+    std::vector<cv::KeyPoint> candidates;
+    for (int i = 0; i < candidateIds.size(); i++)
+    {
+        candidates.push_back(peaks[candidateIds[i]]);
     }
 
-    // find peaks not seen in the last frame for blinker candidates
-    std::vector<cv::KeyPoint> candidates;
-    detectPeakRise(descriptors, prev_descriptors, peaks, candidates);
+    // results from spatial detection
+    cv::Mat res_1;
+    cv::drawKeypoints(I->image, 
+            peaks, 
+            res_1, 
+            cv::Scalar(0, 0, 255), 
+            cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
-    // results
+
+    // results from temporal detection
     cv::Mat res_2;
     cv::drawKeypoints(res_1, 
             candidates, 
@@ -353,17 +352,18 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     event_image_pub.publish(out.toImageMsg());
 
     // publish keypoints
-    // blinker_tracking::KeyPointArray kps_msg;
-    // for (int i = 0; i < keypoints.size(); i++)
-    // {
-    //     blinker_tracking::KeyPoint kp_msg;
-    //     kp_msg.x = keypoints[i].pt.x;
-    //     kp_msg.y = keypoints[i].pt.y;
-    //     kp_msg.theta = keypoints[i].angle;
-    //     kp_msg.size = keypoints[i].size;
-    //     kps_msg.keypoints.push_back(kp_msg);
-    // }
-    // candidate_pub.publish(kps_msg);
+    blinker_tracking::BlobFeatureArray bfa;
+    for (int i = 0; i < candidateIds.size(); i++)
+    {
+        blinker_tracking::BlobFeature bf;
+        bf.x = descriptors.at<float>(candidateIds[i], 0);
+        bf.y = descriptors.at<float>(candidateIds[i], 1);
+        bf.area = descriptors.at<float>(candidateIds[i], 2);
+        bf.circularity = descriptors.at<float>(candidateIds[i], 3);
+        bf.confidence = descriptors.at<float>(candidateIds[i], 4);
+        bfa.features.push_back(bf);
+    }
+    candidate_pub.publish(bfa);
 
     // save last frame
     I_0 = I;
@@ -439,15 +439,15 @@ int main(int argc, char *argv[])
     nh.param(std::string("minDistBetweenBlobs"),    params.minDistBetweenBlobs, (float) 100);
 
     nh.param(std::string("areaWeight"),             areaWeight,                 (float) 1.0);
-    nh.param(std::string("circularityWeight"),      circularityWeight,          (float) 1.0);
-    nh.param(std::string("confidenceWeight"),       confidenceWeight,           (float) 1.0);
+    nh.param(std::string("circularityWeight"),      circularityWeight,          (float) 0.0);
+    nh.param(std::string("confidenceWeight"),       confidenceWeight,           (float) 0.0);
     nh.param(std::string("peakRiseThreshold"),      peakRiseThreshold,          (float) 100.0);
 
     ros::Subscriber sub;
     sub = nh.subscribe("image_raw", 10, &callback);
 
     event_image_pub = it.advertise("image_out", 1);
-    candidate_pub = nh.advertise<blinker_tracking::KeyPointArray>("candidates", 5);
+    candidate_pub = nh.advertise<blinker_tracking::BlobFeatureArray>("candidates", 5);
 
     ros::spin();
     return 0;

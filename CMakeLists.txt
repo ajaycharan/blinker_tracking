@@ -58,8 +58,8 @@ find_package(OpenCV REQUIRED)
 
 add_message_files(
     FILES
-    KeyPoint.msg
-    KeyPointArray.msg
+    BlobFeature.msg
+    BlobFeatureArray.msg
     )
 
 ## Generate services in the 'srv' folder
