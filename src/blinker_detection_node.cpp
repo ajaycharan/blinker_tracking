@@ -337,27 +337,18 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
         candidates.push_back(peaks[candidateIds[i]]);
     }
 
-    // results from spatial detection
-    cv::Mat res_1;
+    // results from spatial and temporal detection
+    cv::Mat res;
     cv::drawKeypoints(I->image, 
-            peaks, 
-            res_1, 
-            cv::Scalar(0, 0, 255), 
-            cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
-
-
-    // results from temporal detection
-    cv::Mat res_2;
-    cv::drawKeypoints(res_1, 
             candidates, 
-            res_2, 
-            cv::Scalar(255, 0, 0), 
+            res, 
+            cv::Scalar(0, 0, 255), 
             cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
 
     // publish image with overlay
     cv_bridge::CvImage out;
     out.encoding = std::string("bgr8");
-    out.image = res_2;
+    out.image = res;
     event_image_pub.publish(out.toImageMsg());
 
     // publish candidates
