@@ -152,11 +152,18 @@ include_directories(
 
 add_executable(blinker_detector src/blinker_detector.cpp)
 
+add_executable(blinker_tracker src/blinker_tracker.cpp)
+
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(blinker_tracking_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 add_dependencies(blinker_detector 
+    ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+    ${catkin_EXPORTED_TARGETS}
+    )
+
+add_dependencies(blinker_tracker
     ${${PROJECT_NAME}_EXPORTED_TARGETS} 
     ${catkin_EXPORTED_TARGETS}
     )
@@ -167,6 +174,12 @@ add_dependencies(blinker_detector
 # )
 
 target_link_libraries(blinker_detector
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
+target_link_libraries(blinker_tracker
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Boost_LIBRARIES}
