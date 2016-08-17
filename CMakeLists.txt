@@ -12,6 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  cmake_modules
 )
 
 ## System dependencies are found with CMake's conventions
@@ -19,6 +20,7 @@ find_package(catkin REQUIRED COMPONENTS
 
 find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(Eigen REQUIRED)
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -119,8 +121,8 @@ generate_messages(
 catkin_package(
     INCLUDE_DIRS include
     LIBRARIES blinker_tracking
-    CATKIN_DEPENDS cv_bridge image_transport message_runtime roscpp rospy sensor_msgs std_msgs
-    DEPENDS system_lib
+    CATKIN_DEPENDS cv_bridge image_transport message_runtime roscpp rospy sensor_msgs std_msgs cmake_modules
+    DEPENDS Eigen
     )
 
 ###########
@@ -135,6 +137,7 @@ include_directories(
     ${catkin_INCLUDE_DIRS}
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
+    ${Eigen_INCLUDE_DIRS}
     )
 
 ## Declare a C++ library
@@ -183,6 +186,7 @@ target_link_libraries(blinker_tracker
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Boost_LIBRARIES}
+  ${Eigen_LIBRARIES}
 )
 
 #############

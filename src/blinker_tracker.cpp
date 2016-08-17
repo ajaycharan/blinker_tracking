@@ -7,6 +7,8 @@
 #include <vector>
 #include <algorithm>
 
+#include <blinker_tracking/ekf.hpp>
+
 #define DYNAM_PARAMS   2
 #define MEASURE_PARAMS   2
 
@@ -14,24 +16,33 @@
 double alpha;
 
 // camera intrinsics matrix
-cv::Mat K;
+blinker_tracking::Matrix3d K;
 
 // process noise matrix
-cv::Mat Q;
+blinker_tracking::Matrix2d Q;
 
 // measurement noise matrix
-cv::Mat R;
+blinker_tracking::Matrix2d R;
 
 // array of tracked blinkers
-std::vector< cv::KalmanFilter > particles;
+std::vector< blinker_tracking::EKF > particles;
 
 void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 {
 
+    // convert quaternion to rotation matrix
+
+    // create homography
+    // blinker_tracking::Matrix3d H = K * R.transpose() * K.inverse();
+
     // propogate all predictions
     for (int i = 0; i < particles.size(); i++)
     {
-        
+
+        // kill off particles with too high of a covariance or that have
+        //      not been seen for a certain number of steps
+
+        // predict
     }
 
 }
@@ -49,20 +60,21 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
     {
 
         // extract observation data
-        cv::Mat zi = (cv::Mat_<double>(DYNAM_PARAMS, 1) <<
-                msg->features[i].x,
-                msg->features[i].y);
+        blinker_tracking::Vector2d zi; 
+        zi <<
+            msg->features[i].x,
+            msg->features[i].y;
 
         // data association loop -- compare zi to all other tracked blobs
         std::vector<double> pi;
         for (int k = 0; k < particles.size(); k++)
         {
-            cv::Mat zk = particles[k].statePre;
-            cv::Mat S = particles[k].errorCovPre;
+            blinker_tracking::Vector2d zk = particles[k].getState();
+            blinker_tracking::Matrix2d S = particles[k].getCovariance();
 
             // compute mahalanobis distance
-            cv::Mat d = ( (zi - zk).t() * S * (zi - zk) );
-            pi.push_back(d.at<double>(0));
+            double d = ( (zi - zk).transpose() * S * (zi - zk) );
+            pi.push_back(d);
         }
 
         // check for sufficient newness before adding new element
@@ -72,22 +84,18 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         // add element
         if (j > particles.size())
         {
-            cv::KalmanFilter KF(DYNAM_PARAMS, MEASURE_PARAMS, 0);
+            // create particle
+            blinker_tracking::EKF ekf;
+            ekf.Q = Q;
+            ekf.R = R;
 
-            cv::setIdentity(KF.transitionMatrix);
-            // TODO: [PROBLEM] this should be a 3x3 for the homography...
-            // is this nonlinear...?
-
-            cv::setIdentity(KF.measurementMatrix);
-            KF.processNoiseCov = Q.clone();
-            KF.measurementNoiseCov = R.clone();
-
+            // add new particle
+            particles.push_back(ekf);
         }
 
         // update
+        particles[j].correct(zi);
 
-        // kill off particles with too high of a covariance or that have
-        //      not been seen for a certain number of steps
     }
 
 }
@@ -118,18 +126,18 @@ int main (int argc, char* argv[])
     nh.param(std::string("Rx"), Rx, 4.0);
     nh.param(std::string("Ry"), Ry, 4.0);
     
-    K  = (cv::Mat_<double>(3, 3) << 
-            fx,     s,      cx,
-            0.0,    fy,     cy,
-            0.0,    0.0,    1.0);
+    K << 
+        fx,     s,      cx,
+        0.0,    fy,     cy,
+        0.0,    0.0,    1.0;
 
-    Q  = (cv::Mat_<double>(DYNAM_PARAMS, DYNAM_PARAMS) << 
-            Qx,     0.0,
-            0.0,    Qy);
+    Q << 
+        Qx,     0.0,
+        0.0,    Qy;
 
-    R  = (cv::Mat_<double>(DYNAM_PARAMS, DYNAM_PARAMS) << 
-            Rx,     0.0,
-            0.0,    Ry);
+    R << 
+        Rx,     0.0,
+        0.0,    Ry;
 
     ros::Subscriber imu_sub;
     imu_sub = nh.subscribe("imu", 10, &imu_callback);
