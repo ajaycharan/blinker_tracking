@@ -1,0 +1,11 @@
+<launch>
+
+    <!-- Live Detection -->
+    <include file="$(find blinker_tracking)/launch/blinker_detection.launch" />
+
+    <node name="blinker_tracker" pkg="blinker_tracking" type="blinker_tracker" output="screen">
+        <remap from="~imu" to="/sync/imu/imu"/>
+        <remap from="~blob" to="/blinker_detector/candidates"/>
+    </node>
+
+</launch>
