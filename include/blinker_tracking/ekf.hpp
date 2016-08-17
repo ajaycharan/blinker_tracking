@@ -1,69 +1,96 @@
 #ifndef EKF_HPP
 #define EKF_HPP
 
-#include <Eigen/Core>
+#include <cmath>
+#include <Eigen/Dense>
+
 
 namespace blinker_tracking
 {
-
-    typedef Eigen::Matrix<double, 2, 1> Vector2d;
-
-    typedef Eigen::Matrix<double, 2, 2> Matrix2d;
-    typedef Eigen::Matrix<double, 3, 3> Matrix3d;
-
 
     class EKF
     {
         private:
             
-            Vector2d x;
-            Matrix2d P;
-
-            Matrix2d F;
-            Matrix2d H;
+            Eigen::Vector2d x;
+            Eigen::Matrix2d P;
 
         public:
 
-            Matrix2d Q;
-            Matrix2d R;
+            Eigen::Matrix2d Q;
+            Eigen::Matrix2d R;
 
-            EKF();
-            void predict(Matrix3d Hom);
-            void correct(Vector2d zi);
+            EKF(Eigen::Vector2d x0);
+            void predict(Eigen::Matrix3d Hom);
+            void correct(Eigen::Vector2d zi);
 
-            Vector2d getState();
-            Matrix2d getCovariance();
+            Eigen::Vector2d getState();
+            Eigen::Matrix2d getCovariance();
 
     };
 
-    EKF::EKF()
+    EKF::EKF(Eigen::Vector2d x0)
     {
-        P = Matrix2d::Identity();
-        F = Matrix2d::Zero();
-        H = Matrix2d::Identity();
-
-        Q = Matrix2d::Zero();
-        R = Matrix2d::Zero();
+        this->x = x0;
+        this->P = Eigen::Matrix2d::Identity();
+        this->Q = Eigen::Matrix2d::Zero();
+        this->R = Eigen::Matrix2d::Zero();
     }
 
-    Vector2d EKF::getState()
+    Eigen::Vector2d EKF::getState()
     {
         return this->x;
     }
 
-    Matrix2d EKF::getCovariance()
+    Eigen::Matrix2d EKF::getCovariance()
     {
         return this->P;
     }
 
-    void EKF::predict(Matrix3d Hom)
+    void EKF::predict(Eigen::Matrix3d Hom)
     {
+        // homogeneous coordinates
+        Eigen::Vector3d x_tilde;
+        x_tilde  << this->x(0), this->x(1), 1.0;
 
+        // intermediary values
+        double gx   = Hom.row(0) * x_tilde;
+        double gy   = Hom.row(1) * x_tilde;
+        double h    = Hom.row(2) * x_tilde;
+
+        // update transition matrix
+        Eigen::Matrix2d F;
+        F << 
+            (Hom(0, 0) * h - Hom(2, 0) * gx) / (h*h),   (Hom(0, 1) * h - Hom(2, 1) * gx) / (h*h),
+            (Hom(1, 0) * h - Hom(2, 0) * gy) / (h*h),   (Hom(1, 1) * h - Hom(2, 1) * gy) / (h*h);
+
+        // propogate
+        this->x = Eigen::Vector2d(gx / h, gy / h);
+        this->P = F * this->P * F.transpose() + this->Q;
         
     }
 
-    void EKF::correct(Vector2d zi)
+    void EKF::correct(Eigen::Vector2d zi)
     {
+        // measurement matrix
+        Eigen::Matrix2d I = Eigen::Matrix2d::Identity();
+        Eigen::Matrix2d H = Eigen::Matrix2d::Identity();
+
+        // innovation residual
+        Eigen::Vector2d y = zi - H * this->x;
+
+        // innovation covariance
+        Eigen::Matrix2d S = H * this->P * H.transpose() + this->R;
+
+        // Kalman gain
+        Eigen::Matrix2d K = this->P * H.transpose() * S.inverse();
+
+        // updated state
+        this->x = this->x + K * y;
+
+        // updated covariance
+        this->P = (I - K * H) * this->P;
+
 
     }
 

@@ -16,13 +16,13 @@
 double alpha;
 
 // camera intrinsics matrix
-blinker_tracking::Matrix3d K;
+Eigen::Matrix3d K;
 
 // process noise matrix
-blinker_tracking::Matrix2d Q;
+Eigen::Matrix2d Q;
 
 // measurement noise matrix
-blinker_tracking::Matrix2d R;
+Eigen::Matrix2d R;
 
 // array of tracked blinkers
 std::vector< blinker_tracking::EKF > particles;
@@ -30,19 +30,29 @@ std::vector< blinker_tracking::EKF > particles;
 void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 {
 
+
     // convert quaternion to rotation matrix
+    Eigen::Quaternion<double> q = Eigen::Quaternion<double>(
+            msg->orientation.w,
+            msg->orientation.x,
+            msg->orientation.y,
+            msg->orientation.z);
+
+    Eigen::Matrix3d Rot = q.toRotationMatrix();
 
     // create homography
-    // blinker_tracking::Matrix3d H = K * R.transpose() * K.inverse();
+    Eigen::Matrix3d H = K * Rot.transpose() * K.inverse();
 
     // propogate all predictions
     for (int i = 0; i < particles.size(); i++)
     {
 
+        // predict
+        particles[i].predict(H);
+
         // kill off particles with too high of a covariance or that have
         //      not been seen for a certain number of steps
 
-        // predict
     }
 
 }
@@ -60,7 +70,7 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
     {
 
         // extract observation data
-        blinker_tracking::Vector2d zi; 
+        Eigen::Vector2d zi; 
         zi <<
             msg->features[i].x,
             msg->features[i].y;
@@ -69,8 +79,8 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         std::vector<double> pi;
         for (int k = 0; k < particles.size(); k++)
         {
-            blinker_tracking::Vector2d zk = particles[k].getState();
-            blinker_tracking::Matrix2d S = particles[k].getCovariance();
+            Eigen::Vector2d zk = particles[k].getState();
+            Eigen::Matrix2d S = particles[k].getCovariance();
 
             // compute mahalanobis distance
             double d = ( (zi - zk).transpose() * S * (zi - zk) );
@@ -84,8 +94,14 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         // add element
         if (j > particles.size())
         {
+            // initial position
+            Eigen::Vector2d x0;
+            x0 << 
+                msg->features[i].x,
+                msg->features[i].y;
+            
             // create particle
-            blinker_tracking::EKF ekf;
+            blinker_tracking::EKF ekf(x0);
             ekf.Q = Q;
             ekf.R = R;
 
@@ -97,6 +113,8 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         particles[j].correct(zi);
 
     }
+
+    // TODO: Save seq id to track corresponding image for the blob
 
 }
 
