@@ -1,6 +1,7 @@
 #ifndef EKF_HPP
 #define EKF_HPP
 
+#include <ostream>
 #include <cmath>
 #include <Eigen/Dense>
 
@@ -20,18 +21,21 @@ namespace blinker_tracking
             Eigen::Matrix2d Q;
             Eigen::Matrix2d R;
 
-            EKF(Eigen::Vector2d x0);
+            EKF(Eigen::Vector2d x_0);
             void predict(Eigen::Matrix3d Hom);
-            void correct(Eigen::Vector2d zi);
+            void correct(Eigen::Vector2d z_i);
 
             Eigen::Vector2d getState();
             Eigen::Matrix2d getCovariance();
 
+            std::ostream& operator<<(EKF ekf);
+
+
     };
 
-    EKF::EKF(Eigen::Vector2d x0)
+    EKF::EKF(Eigen::Vector2d x_0)
     {
-        this->x = x0;
+        this->x = x_0;
         this->P = Eigen::Matrix2d::Identity();
         this->Q = Eigen::Matrix2d::Zero();
         this->R = Eigen::Matrix2d::Zero();
@@ -70,14 +74,14 @@ namespace blinker_tracking
         
     }
 
-    void EKF::correct(Eigen::Vector2d zi)
+    void EKF::correct(Eigen::Vector2d z_i)
     {
         // measurement matrix
         Eigen::Matrix2d I = Eigen::Matrix2d::Identity();
         Eigen::Matrix2d H = Eigen::Matrix2d::Identity();
 
         // innovation residual
-        Eigen::Vector2d y = zi - H * this->x;
+        Eigen::Vector2d y = z_i - H * this->x;
 
         // innovation covariance
         Eigen::Matrix2d S = H * this->P * H.transpose() + this->R;
@@ -92,6 +96,14 @@ namespace blinker_tracking
         this->P = (I - K * H) * this->P;
 
 
+    }
+
+    std::ostream& EKF::operator<<(EKF ekf)
+    {
+        std::cout << "-" << std::endl <<
+            "state: " << this->x <<
+            "covariance: " << this->P << 
+            std::endl;
     }
 
 }

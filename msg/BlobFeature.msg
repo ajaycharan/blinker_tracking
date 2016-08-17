@@ -1,7 +1,7 @@
-float32 x
-float32 y
-float32 confidence
+float64 u
+float64 v
+float64 confidence
 
-float32 area
-float32 circularity
+float64 area
+float64 circularity
 

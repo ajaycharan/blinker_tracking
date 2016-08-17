@@ -358,8 +358,8 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     for (int i = 0; i < candidateIds.size(); i++)
     {
         blinker_tracking::BlobFeature bf;
-        bf.x = descriptors.at<float>(candidateIds[i], 0);
-        bf.y = descriptors.at<float>(candidateIds[i], 1);
+        bf.u = descriptors.at<float>(candidateIds[i], 0);
+        bf.v = descriptors.at<float>(candidateIds[i], 1);
         bf.area = descriptors.at<float>(candidateIds[i], 2);
         bf.circularity = descriptors.at<float>(candidateIds[i], 3);
         bf.confidence = descriptors.at<float>(candidateIds[i], 4);

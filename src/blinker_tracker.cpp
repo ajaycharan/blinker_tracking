@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include <opencv/cv.hpp>
+#include <unsupported/Eigen/MatrixFunctions>
 
 #include <sensor_msgs/Imu.h>
 #include <blinker_tracking/BlobFeatureArray.h>
@@ -30,15 +30,27 @@ std::vector< blinker_tracking::EKF > particles;
 void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 {
 
+    // extract angular velocities
+    Eigen::Vector3d w = Eigen::Vector3d(
+            msg->angular_velocity.x,
+            msg->angular_velocity.y,
+            msg->angular_velocity.z);
 
-    // convert quaternion to rotation matrix
-    Eigen::Quaternion<double> q = Eigen::Quaternion<double>(
-            msg->orientation.w,
-            msg->orientation.x,
-            msg->orientation.y,
-            msg->orientation.z);
+    // angular velocities in skew symmetric
+    Eigen::Matrix3d skew;
+    skew <<
+        0.0,    -w(2),  w(1),
+        w(2),   0.0,    -w(0),
+        -w(1),  w(0),   0.0;
 
-    Eigen::Matrix3d Rot = q.toRotationMatrix();
+    Eigen::Matrix3d T;
+    T <<
+        1.0,    0.0,    0.0,
+        0.0,    -1.0,   0.0,
+        0.0,    0.0,    -1.0;
+
+    // compute rotation change in the camera frame I like
+    Eigen::Matrix3d Rot = T.inverse() * skew.exp() * T;
 
     // create homography
     Eigen::Matrix3d H = K * Rot.transpose() * K.inverse();
@@ -70,20 +82,20 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
     {
 
         // extract observation data
-        Eigen::Vector2d zi; 
-        zi <<
-            msg->features[i].x,
-            msg->features[i].y;
+        Eigen::Vector2d z_i; 
+        z_i <<
+            msg->features[i].u,
+            msg->features[i].v;
 
-        // data association loop -- compare zi to all other tracked blobs
+        // data association loop -- compare z_i to all other tracked blobs
         std::vector<double> pi;
         for (int k = 0; k < particles.size(); k++)
         {
-            Eigen::Vector2d zk = particles[k].getState();
+            Eigen::Vector2d z_k = particles[k].getState();
             Eigen::Matrix2d S = particles[k].getCovariance();
 
             // compute mahalanobis distance
-            double d = ( (zi - zk).transpose() * S * (zi - zk) );
+            double d = ( (z_i - z_k).transpose() * S * (z_i - z_k) );
             pi.push_back(d);
         }
 
@@ -95,13 +107,13 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         if (j > particles.size())
         {
             // initial position
-            Eigen::Vector2d x0;
-            x0 << 
-                msg->features[i].x,
-                msg->features[i].y;
+            Eigen::Vector2d x_0;
+            x_0 << 
+                msg->features[i].u,
+                msg->features[i].v;
             
             // create particle
-            blinker_tracking::EKF ekf(x0);
+            blinker_tracking::EKF ekf(x_0);
             ekf.Q = Q;
             ekf.R = R;
 
@@ -110,7 +122,7 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         }
 
         // update
-        particles[j].correct(zi);
+        particles[j].correct(z_i);
 
     }
 
