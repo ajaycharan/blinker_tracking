@@ -6,6 +6,7 @@
 
     <node pkg="image_view" type="image_view" name="image_view_detection">
         <remap from="image" to="/blinker_detector/image_out" />
+        <param name="atuosize" value="true" />
     </node>
 
     <node name="blinker_detector" pkg="blinker_tracking" type="blinker_detector" output="screen">

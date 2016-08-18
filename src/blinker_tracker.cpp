@@ -37,6 +37,8 @@ std::vector< blinker_tracking::EKF > particles;
 void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 {
 
+    std::cout << "Prediction: " << std::endl;
+
     // extract rotation
     Eigen::Quaternion<double> q = Eigen::Quaternion<double>(
             msg->orientation.w,
@@ -48,6 +50,9 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
     // delta R
     Eigen::Matrix3d dRot_imu = Rot * Rot_0.transpose();
 
+    // save rotation
+    Rot_0 = Rot;
+
     // transform between IMU and camera frames
     Eigen::Matrix3d T;
     T <<
@@ -56,10 +61,12 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
         0.0,    0.0,    -1.0;
 
     // compute rotation change in the camera frame I like
-    Eigen::Matrix3d dRot_cam = T.inverse() * dRot_imu * T;
+    Eigen::Matrix3d dRot_cam = T * dRot_imu * T.transpose();
 
     // create homography
     Eigen::Matrix3d H = K * dRot_cam.transpose() * K.inverse();
+
+    std::cout << dRot_cam << std::endl;
 
     // propogate all predictions
     for (int i = 0; i < particles.size(); i++)
@@ -71,18 +78,20 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
         // kill off particles with too high of a covariance or that have
         //      not been seen for a certain number of steps
 
+        std::cout << particles[i] << std::endl;
     }
 
 }
 
 void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
 {
-
     // check input
     if (msg->features.size() == 0)
     {
         return;
     }
+
+    std::cout << "Update: " << std::endl;
 
     // for each feature seen
     for (int i = 0; i < msg->features.size(); i++)
@@ -111,7 +120,6 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         // check for sufficient newness before adding new element
         pi.push_back(alpha);
         int j = std::min_element(pi.begin(), pi.end()) - pi.begin();
-        std::cout << alpha << std::endl;
 
         // add element
         if (j >= particles.size())
@@ -129,6 +137,10 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
 
             // add new particle
             particles.push_back(ekf);
+
+            std::cout << ekf << std::endl;
+
+            return;
         }
 
         // update
