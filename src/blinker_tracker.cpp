@@ -85,12 +85,6 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 
 void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
 {
-    // check input
-    if (msg->features.size() == 0)
-    {
-        return;
-    }
-
     std::cout << "Update: " << std::endl;
 
     // for each feature seen
