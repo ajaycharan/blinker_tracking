@@ -20,34 +20,56 @@ std::queue< sensor_msgs::Image::ConstPtr > image_queue;
 void blinker_callback(const blinker_tracking::BlinkerArray::ConstPtr &msg)
 {
 
-    std::cout << "[" << std::endl;
+    // int k = image_queue.size();
+    // while(k > 0)
+    // {
+    
+    if (image_queue.size() == 0)
+        return;
 
-    int k = image_queue.size();
-    while(k > 0)
+    // get oldest image
+    sensor_msgs::Image::ConstPtr image_ros = image_queue.front();
+    image_queue.pop();
+    // k--;
+
+    // std::cout << 
+    //     "-" << std::endl <<
+    //     "blinker id: " << msg->header.seq << std::endl <<
+    //     "image id: " << image_ros->header.seq << std::endl;
+
+    // if(msg->header.seq != image_ros->header.seq)
+    // {
+    //     continue;
+    // }
+
+    // convert from ros type to cv_bridge type
+    cv_bridge::CvImagePtr image_ptr;
+    image_ptr = cv_bridge::toCvCopy(image_ros);
+
+    // extract opencv mat
+    cv::Mat I = image_ptr->image;
+
+    // list of keypoints for plotting
+    std::vector< cv::KeyPoint > keypoints;
+    for (int i = 0; i < msg->blinkers.size(); i++)
     {
-        // get oldest image
-        sensor_msgs::Image::ConstPtr image_ros = image_queue.front();
-        image_queue.pop();
-        k--;
-
-        cv_bridge::CvImagePtr image_ptr;
-        image_ptr = cv_bridge::toCvCopy(image_ros);
-
-        cv::Mat I = image_ptr->image;
-
-        std::cout << 
-            "-" << std::endl <<
-            "blinker id: " << msg->header.seq << std::endl <<
-            "image id: " << image_ros->header.seq << std::endl;
-
-        if(msg->header.seq == image_ros->header.seq)
-        {
-            std::cout << "Wuddup" << std::endl;
-        }
-
+        cv::Point2d p(msg->blinkers[i].u, msg->blinkers[i].v);
+        cv::KeyPoint kp(p, 20);
+        keypoints.push_back(kp);
     }
 
-    std::cout << "]" << std::endl;
+    // draw
+    cv::Mat res;
+    cv::drawKeypoints(I, keypoints, res, cv::Scalar(0, 255, 0), 
+            cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+
+    // publish
+    cv_bridge::CvImage out;
+    out.encoding = std::string("bgr8");
+    out.image = res;
+    image_pub.publish(out.toImageMsg());
+
+    // }
 
 }
 

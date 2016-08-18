@@ -1,7 +1,7 @@
 <launch>
 
     <node pkg="image_view" type="image_view" name="image_view_detection">
-        <remap from="image" to="/blinker_detector/image_out" />
+        <remap from="image" to="/blinker_tracker_viz/image_out" />
         <param name="atuosize" value="true" />
     </node>
 
