@@ -1,11 +1,21 @@
 <launch>
 
+    <node pkg="image_view" type="image_view" name="image_view_detection">
+        <remap from="image" to="/blinker_detector/image_out" />
+        <param name="atuosize" value="true" />
+    </node>
+
     <!-- Live Detection -->
     <include file="$(find blinker_tracking)/launch/blinker_detection.launch" />
 
-    <node name="blinker_tracker" pkg="blinker_tracking" type="blinker_tracker" output="screen">
+    <node name="blinker_tracker" pkg="blinker_tracking" type="blinker_tracker">
         <remap from="~imu" to="/sync/imu/imu"/>
         <remap from="~blob" to="/blinker_detector/candidates"/>
+    </node>
+
+    <node name="blinker_tracker_viz" pkg="blinker_tracking" type="blinker_tracker_viz" output="screen">
+        <remap from="~image_in" to="/blinker_detector/image_out"/>
+        <remap from="~blinkers" to="/blinker_tracker/blinkers"/>
     </node>
 
 </launch>

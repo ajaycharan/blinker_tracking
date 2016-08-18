@@ -310,8 +310,8 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
 {
 
     // extract input
-    cv_bridge::CvImagePtr I;
-    I = cv_bridge::toCvCopy(msg);
+    cv_bridge::CvImageConstPtr I;
+    I = cv_bridge::toCvShare(msg);
 
     // find peaks
     std::vector<cv::KeyPoint> peaks;
@@ -349,7 +349,11 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     cv_bridge::CvImage out;
     out.encoding = std::string("bgr8");
     out.image = res;
-    event_image_pub.publish(out.toImageMsg());
+
+    sensor_msgs::ImagePtr image_ros = out.toImageMsg();
+    image_ros->header.seq = msg->header.seq;
+    image_ros->header.stamp = msg->header.stamp;
+    event_image_pub.publish(image_ros);
 
     // publish candidates
     blinker_tracking::BlobFeatureArray bfa;
@@ -443,10 +447,10 @@ int main(int argc, char *argv[])
     nh.param(std::string("peakRiseThreshold"),      peakRiseThreshold,          (float) 100.0);
 
     ros::Subscriber sub;
-    sub = nh.subscribe("image_raw", 30, &callback);
+    sub = nh.subscribe("image_raw", 10, &callback);
 
-    event_image_pub = it.advertise("image_out", 1);
-    candidate_pub = nh.advertise<blinker_tracking::BlobFeatureArray>("candidates", 5);
+    event_image_pub = it.advertise("image_out", 10);
+    candidate_pub = nh.advertise<blinker_tracking::BlobFeatureArray>("candidates", 10);
 
     ros::spin();
     return 0;
