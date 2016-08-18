@@ -1,7 +1,7 @@
 #ifndef EKF_HPP
 #define EKF_HPP
 
-#include <ostream>
+#include <iostream>
 #include <cmath>
 #include <Eigen/Dense>
 
@@ -27,9 +27,6 @@ namespace blinker_tracking
 
             Eigen::Vector2d getState();
             Eigen::Matrix2d getCovariance();
-
-            std::ostream& operator<<(EKF ekf);
-
 
     };
 
@@ -98,15 +95,19 @@ namespace blinker_tracking
 
     }
 
-    std::ostream& EKF::operator<<(EKF ekf)
-    {
-        std::cout << "-" << std::endl <<
-            "state: " << this->x <<
-            "covariance: " << this->P << 
-            std::endl;
-    }
-
 }
+
+std::ostream& operator<<(std::ostream& os, blinker_tracking::EKF& ekf)
+{
+    os << "-" << std::endl <<
+        "state: " << std::endl << 
+        ekf.getState() << std::endl <<
+        "covariance: " << std::endl << 
+        ekf.getCovariance() << std::endl;
+
+    return os;
+}
+
 
 
 #endif

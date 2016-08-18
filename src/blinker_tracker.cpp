@@ -24,25 +24,28 @@ Eigen::Matrix2d Q;
 // measurement noise matrix
 Eigen::Matrix2d R;
 
+// last rotation
+Eigen::Matrix3d Rot_0;
+
 // array of tracked blinkers
+// TODO: Manage this resource
 std::vector< blinker_tracking::EKF > particles;
 
 void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 {
 
-    // extract angular velocities
-    Eigen::Vector3d w = Eigen::Vector3d(
-            msg->angular_velocity.x,
-            msg->angular_velocity.y,
-            msg->angular_velocity.z);
+    // extract rotation
+    Eigen::Quaternion<double> q = Eigen::Quaternion<double>(
+            msg->orientation.w,
+            msg->orientation.x,
+            msg->orientation.y,
+            msg->orientation.z);
+    Eigen::Matrix3d Rot = q.toRotationMatrix();
 
-    // angular velocities in skew symmetric
-    Eigen::Matrix3d skew;
-    skew <<
-        0.0,    -w(2),  w(1),
-        w(2),   0.0,    -w(0),
-        -w(1),  w(0),   0.0;
+    // delta R
+    Eigen::Matrix3d dRot_imu = Rot * Rot_0.transpose();
 
+    // transform between IMU and camera frames
     Eigen::Matrix3d T;
     T <<
         1.0,    0.0,    0.0,
@@ -50,10 +53,10 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
         0.0,    0.0,    -1.0;
 
     // compute rotation change in the camera frame I like
-    Eigen::Matrix3d Rot = T.inverse() * skew.exp() * T;
+    Eigen::Matrix3d dRot_cam = T.inverse() * dRot_imu * T;
 
     // create homography
-    Eigen::Matrix3d H = K * Rot.transpose() * K.inverse();
+    Eigen::Matrix3d H = K * dRot_cam.transpose() * K.inverse();
 
     // propogate all predictions
     for (int i = 0; i < particles.size(); i++)
@@ -71,6 +74,7 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 
 void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
 {
+
     // check input
     if (msg->features.size() == 0)
     {
@@ -97,14 +101,17 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
             // compute mahalanobis distance
             double d = ( (z_i - z_k).transpose() * S * (z_i - z_k) );
             pi.push_back(d);
+
+            std::cout << d << std::endl;
         }
 
         // check for sufficient newness before adding new element
         pi.push_back(alpha);
         int j = std::min_element(pi.begin(), pi.end()) - pi.begin();
+        std::cout << alpha << std::endl;
 
         // add element
-        if (j > particles.size())
+        if (j >= particles.size())
         {
             // initial position
             Eigen::Vector2d x_0;
@@ -125,6 +132,12 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         particles[j].correct(z_i);
 
     }
+
+    for (int i = 0; i < particles.size(); i++)
+    {
+        std::cout << particles[i] << std::endl;
+    }
+    std::cout << std::endl;
 
     // TODO: Save seq id to track corresponding image for the blob
 
@@ -168,6 +181,8 @@ int main (int argc, char* argv[])
     R << 
         Rx,     0.0,
         0.0,    Ry;
+
+    Rot_0 = Eigen::Matrix3d::Identity();
 
     ros::Subscriber imu_sub;
     imu_sub = nh.subscribe("imu", 10, &imu_callback);
