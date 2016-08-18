@@ -1,7 +1,7 @@
 #include <ros/ros.h>
-#include <unsupported/Eigen/MatrixFunctions>
 
 #include <sensor_msgs/Imu.h>
+#include <blinker_tracking/BlinkerArray.h>
 #include <blinker_tracking/BlobFeatureArray.h>
 
 #include <vector>
@@ -11,6 +11,9 @@
 
 #define DYNAM_PARAMS   2
 #define MEASURE_PARAMS   2
+
+// publisher
+ros::Publisher pub;
 
 // correspondence threshold
 double alpha;
@@ -28,7 +31,7 @@ Eigen::Matrix2d R;
 Eigen::Matrix3d Rot_0;
 
 // array of tracked blinkers
-// TODO: Manage this resource
+// TODO: Manage this resource with a mutex lock
 std::vector< blinker_tracking::EKF > particles;
 
 void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
@@ -133,13 +136,26 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
 
     }
 
+    // publish blinkers
+    blinker_tracking::BlinkerArray ba;
+    ba.header.seq = msg->header.seq;
+    ba.header.stamp = msg->header.stamp;
     for (int i = 0; i < particles.size(); i++)
     {
+        blinker_tracking::Blinker b;
+        b.u = particles[i].getState()(0);
+        b.v = particles[i].getState()(1);
+        b.covariance[0] = particles[i].getCovariance()(0, 0);
+        b.covariance[1] = particles[i].getCovariance()(0, 1);
+        b.covariance[2] = particles[i].getCovariance()(1, 0);
+        b.covariance[3] = particles[i].getCovariance()(1, 1);
+        ba.blinkers.push_back(b);
+
         std::cout << particles[i] << std::endl;
     }
     std::cout << std::endl;
 
-    // TODO: Save seq id to track corresponding image for the blob
+    pub.publish(ba);
 
 }
 
@@ -190,7 +206,7 @@ int main (int argc, char* argv[])
     ros::Subscriber blob_sub;
     blob_sub = nh.subscribe("blob", 10, &blob_callback);
 
-    // publish posterior measuremnts
+    pub = nh.advertise<blinker_tracking::BlinkerArray>("blinkers", 5);
 
     ros::spin();
     return 0;
