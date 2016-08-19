@@ -197,8 +197,8 @@ int main (int argc, char* argv[])
     ros::NodeHandle nh("~");
 
     // parameters
-    nh.param(std::string("alpha"), alpha, 3.0);
-    nh.param(std::string("beta"), beta, 1e6);
+    nh.param(std::string("alpha"), alpha, 20.0);
+    nh.param(std::string("beta"), beta, 5e4);
 
     double fx, fy, cx, cy, s;
     nh.param(std::string("fx"), fx, 602.815050);
@@ -208,8 +208,8 @@ int main (int argc, char* argv[])
     nh.param(std::string("s"), s, 0.0);
 
     double Qx, Qy, Qa, Qc, Qi;
-    nh.param(std::string("Qx"), Qx, 4.0);
-    nh.param(std::string("Qy"), Qy, 4.0);
+    nh.param(std::string("Qx"), Qx, 1.0);
+    nh.param(std::string("Qy"), Qy, 1.0);
 
     double Rx, Ry, Ra, Rc, Ri;
     nh.param(std::string("Rx"), Rx, 100.0);
