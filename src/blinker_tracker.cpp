@@ -12,6 +12,9 @@
 #define DYNAM_PARAMS   2
 #define MEASURE_PARAMS   2
 
+// init
+bool is_init = 0;
+
 // publisher
 ros::Publisher pub;
 
@@ -47,12 +50,6 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
             msg->orientation.z);
     Eigen::Matrix3d Rot = q.toRotationMatrix();
 
-    // delta R
-    Eigen::Matrix3d dRot_imu = Rot * Rot_0.transpose();
-
-    // save rotation
-    Rot_0 = Rot;
-
     // transform between IMU and camera frames
     Eigen::Matrix3d T;
     T <<
@@ -61,12 +58,20 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
         0.0,    0.0,    -1.0;
 
     // compute rotation change in the camera frame I like
-    Eigen::Matrix3d dRot_cam = T * dRot_imu * T.transpose();
+    Rot = T * Rot * T.transpose();
+
+    if (!is_init)
+    {
+        Rot_0 = Rot;
+        is_init = 1;
+        return;
+    }
+
+    // delta R
+    Eigen::Matrix3d dRot = Rot_0.transpose() * Rot;
 
     // create homography
-    Eigen::Matrix3d H = K * dRot_cam.transpose() * K.inverse();
-
-    std::cout << dRot_cam << std::endl;
+    Eigen::Matrix3d H = K * dRot.transpose() * K.inverse();
 
     // propogate all predictions
     for (int i = 0; i < particles.size(); i++)
@@ -80,6 +85,10 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 
         std::cout << particles[i] << std::endl;
     }
+
+    // save rotation
+    Rot_0 = Rot;
+
 
 }
 
@@ -99,17 +108,19 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
 
         // data association loop -- compare z_i to all other tracked blobs
         std::vector<double> pi;
+        std::cout << std::endl;
         for (int k = 0; k < particles.size(); k++)
         {
             Eigen::Vector2d z_k = particles[k].getState();
             Eigen::Matrix2d S = particles[k].getCovariance();
 
             // compute mahalanobis distance
-            double d = ( (z_i - z_k).transpose() * S * (z_i - z_k) );
+            double d = std::sqrt( (z_i - z_k).transpose() * S.inverse() * (z_i - z_k) );
             pi.push_back(d);
 
             std::cout << d << std::endl;
         }
+        std::cout << alpha << std::endl;
 
         // check for sufficient newness before adding new element
         pi.push_back(alpha);
@@ -135,10 +146,13 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
             std::cout << ekf << std::endl;
 
             return;
+        } else {
+
+            // update
+            particles[j].correct(z_i);
+
         }
 
-        // update
-        particles[j].correct(z_i);
 
     }
 
@@ -174,7 +188,7 @@ int main (int argc, char* argv[])
     ros::NodeHandle nh("~");
 
     // parameters
-    nh.param(std::string("alpha"), alpha, 100.0);
+    nh.param(std::string("alpha"), alpha, 3.0);
 
     double fx, fy, cx, cy, s;
     nh.param(std::string("fx"), fx, 602.815050);
@@ -184,12 +198,12 @@ int main (int argc, char* argv[])
     nh.param(std::string("s"), s, 0.0);
 
     double Qx, Qy, Qa, Qc, Qi;
-    nh.param(std::string("Qx"), Qx, 0.0);
-    nh.param(std::string("Qy"), Qy, 0.0);
+    nh.param(std::string("Qx"), Qx, 4.0);
+    nh.param(std::string("Qy"), Qy, 4.0);
 
     double Rx, Ry, Ra, Rc, Ri;
-    nh.param(std::string("Rx"), Rx, 4.0);
-    nh.param(std::string("Ry"), Ry, 4.0);
+    nh.param(std::string("Rx"), Rx, 20.0);
+    nh.param(std::string("Ry"), Ry, 20.0);
     
     K << 
         fx,     s,      cx,

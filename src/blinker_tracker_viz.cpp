@@ -1,5 +1,6 @@
 #include <ros/ros.h>
 #include <opencv/cv.hpp>
+#include <Eigen/Dense>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 
@@ -7,6 +8,7 @@
 #include <blinker_tracking/BlinkerArray.h>
 
 #include <queue>
+#include <cmath>
 
 // param
 int k_max_queue_size;
@@ -53,8 +55,19 @@ void blinker_callback(const blinker_tracking::BlinkerArray::ConstPtr &msg)
     std::vector< cv::KeyPoint > keypoints;
     for (int i = 0; i < msg->blinkers.size(); i++)
     {
+
+        Eigen::Matrix2d P;
+        P << msg->blinkers[i].covariance[0], msg->blinkers[i].covariance[1], 
+          msg->blinkers[i].covariance[2], msg->blinkers[i].covariance[3];
+
+        Eigen::Vector2cd eigs;
+        eigs = P.eigenvalues();
+
+        double radius = eigs.norm();
+        std::cout << radius << std::endl;
+
         cv::Point2d p(msg->blinkers[i].u, msg->blinkers[i].v);
-        cv::KeyPoint kp(p, 20);
+        cv::KeyPoint kp(p, radius);
         keypoints.push_back(kp);
     }
 

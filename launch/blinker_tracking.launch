@@ -8,12 +8,12 @@
     <!-- Live Detection -->
     <include file="$(find blinker_tracking)/launch/blinker_detection.launch" />
 
-    <node name="blinker_tracker" pkg="blinker_tracking" type="blinker_tracker">
+    <node name="blinker_tracker" pkg="blinker_tracking" type="blinker_tracker" output="screen">
         <remap from="~imu" to="/sync/imu/imu"/>
         <remap from="~blob" to="/blinker_detector/candidates"/>
     </node>
 
-    <node name="blinker_tracker_viz" pkg="blinker_tracking" type="blinker_tracker_viz" output="screen">
+    <node name="blinker_tracker_viz" pkg="blinker_tracking" type="blinker_tracker_viz">
         <remap from="~image_in" to="/blinker_detector/image_out"/>
         <remap from="~blinkers" to="/blinker_tracker/blinkers"/>
     </node>
