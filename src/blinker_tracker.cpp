@@ -21,6 +21,9 @@ ros::Publisher pub;
 // correspondence threshold
 double alpha;
 
+// max ellipsoid area threshold
+double beta;
+
 // camera intrinsics matrix
 Eigen::Matrix3d K;
 
@@ -82,7 +85,13 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 
         // kill off particles with too high of a covariance or that have
         //      not been seen for a certain number of steps
+        double area = M_PI * particles[i].getCovariance().determinant();
+        if (area > beta)
+        {
+            particles.erase(particles.begin() + i);
+        }
 
+        // std::cout << area << std::endl;
         std::cout << particles[i] << std::endl;
     }
 
@@ -189,6 +198,7 @@ int main (int argc, char* argv[])
 
     // parameters
     nh.param(std::string("alpha"), alpha, 3.0);
+    nh.param(std::string("beta"), beta, 1e6);
 
     double fx, fy, cx, cy, s;
     nh.param(std::string("fx"), fx, 602.815050);
@@ -202,8 +212,8 @@ int main (int argc, char* argv[])
     nh.param(std::string("Qy"), Qy, 4.0);
 
     double Rx, Ry, Ra, Rc, Ri;
-    nh.param(std::string("Rx"), Rx, 20.0);
-    nh.param(std::string("Ry"), Ry, 20.0);
+    nh.param(std::string("Rx"), Rx, 100.0);
+    nh.param(std::string("Ry"), Ry, 100.0);
     
     K << 
         fx,     s,      cx,
