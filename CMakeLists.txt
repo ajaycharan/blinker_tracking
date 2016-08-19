@@ -64,6 +64,8 @@ add_message_files(
     BlinkerArray.msg
     BlobFeature.msg
     BlobFeatureArray.msg
+    BlobsWithImage.msg
+    BlinkersWithImage.msg
     )
 
 ## Generate services in the 'srv' folder
@@ -89,6 +91,7 @@ add_message_files(
 generate_messages(
     DEPENDENCIES
     std_msgs
+    sensor_msgs
     )
 
 ################################################

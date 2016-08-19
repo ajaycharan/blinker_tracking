@@ -1,7 +1,6 @@
 #include <ros/ros.h>
 #include <sensor_msgs/Image.h>
-#include <blinker_tracking/BlobFeature.h>
-#include <blinker_tracking/BlobFeatureArray.h>
+#include <blinker_tracking/BlobsWithImage.h>
 #include <cv_bridge/cv_bridge.h>
 #include <image_transport/image_transport.h>
 #include <opencv/cv.hpp>
@@ -356,9 +355,9 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
     event_image_pub.publish(image_ros);
 
     // publish candidates
-    blinker_tracking::BlobFeatureArray bfa;
-    bfa.header.seq = msg->header.seq;
-    bfa.header.stamp = msg->header.stamp;
+    blinker_tracking::BlobsWithImage bwi;
+    bwi.header.stamp = ros::Time::now();
+    bwi.image = *msg;
     for (int i = 0; i < candidateIds.size(); i++)
     {
         blinker_tracking::BlobFeature bf;
@@ -367,9 +366,9 @@ void callback(const sensor_msgs::Image::ConstPtr &msg)
         bf.area = descriptors.at<float>(candidateIds[i], 2);
         bf.circularity = descriptors.at<float>(candidateIds[i], 3);
         bf.confidence = descriptors.at<float>(candidateIds[i], 4);
-        bfa.features.push_back(bf);
+        bwi.features.push_back(bf);
     }
-    candidate_pub.publish(bfa);
+    candidate_pub.publish(bwi);
 
     // save last set of keypoints
     prev_descriptors = descriptors;
@@ -450,7 +449,7 @@ int main(int argc, char *argv[])
     sub = nh.subscribe("image_raw", 10, &callback);
 
     event_image_pub = it.advertise("image_out", 10);
-    candidate_pub = nh.advertise<blinker_tracking::BlobFeatureArray>("candidates", 10);
+    candidate_pub = nh.advertise<blinker_tracking::BlobsWithImage>("candidates", 10);
 
     ros::spin();
     return 0;

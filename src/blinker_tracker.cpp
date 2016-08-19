@@ -1,8 +1,8 @@
 #include <ros/ros.h>
 
 #include <sensor_msgs/Imu.h>
-#include <blinker_tracking/BlinkerArray.h>
-#include <blinker_tracking/BlobFeatureArray.h>
+#include <blinker_tracking/BlinkersWithImage.h>
+#include <blinker_tracking/BlobsWithImage.h>
 
 #include <vector>
 #include <algorithm>
@@ -101,7 +101,7 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 
 }
 
-void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
+void blob_callback(const blinker_tracking::BlobsWithImage::ConstPtr &msg)
 {
     std::cout << "Update: " << std::endl;
 
@@ -166,9 +166,9 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
     }
 
     // publish blinkers
-    blinker_tracking::BlinkerArray ba;
-    ba.header.seq = msg->header.seq;
-    ba.header.stamp = msg->header.stamp;
+    blinker_tracking::BlinkersWithImage bwi;
+    bwi.header.stamp = ros::Time::now();
+    bwi.image = msg->image;
     for (int i = 0; i < particles.size(); i++)
     {
         blinker_tracking::Blinker b;
@@ -178,13 +178,13 @@ void blob_callback(const blinker_tracking::BlobFeatureArray::ConstPtr &msg)
         b.covariance[1] = particles[i].getCovariance()(0, 1);
         b.covariance[2] = particles[i].getCovariance()(1, 0);
         b.covariance[3] = particles[i].getCovariance()(1, 1);
-        ba.blinkers.push_back(b);
+        bwi.blinkers.push_back(b);
 
         std::cout << particles[i] << std::endl;
     }
     std::cout << std::endl;
 
-    pub.publish(ba);
+    pub.publish(bwi);
 
 }
 
@@ -236,7 +236,7 @@ int main (int argc, char* argv[])
     ros::Subscriber blob_sub;
     blob_sub = nh.subscribe("blob", 10, &blob_callback);
 
-    pub = nh.advertise<blinker_tracking::BlinkerArray>("blinkers", 5);
+    pub = nh.advertise<blinker_tracking::BlinkersWithImage>("blinkers", 5);
 
     ros::spin();
     return 0;
