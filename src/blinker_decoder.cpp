@@ -4,6 +4,7 @@
 #include <cv_bridge/cv_bridge.h>
 
 #include <vector>
+#include <deque>
 #include <unordered_map>
 #include <algorithm>
 
@@ -14,7 +15,7 @@ double width;
 double height;
 
 std::vector< unsigned int > keys_0;
-std::unordered_map< unsigned int, std::vector< cv::Mat > > subframes_0;
+std::unordered_map< unsigned int, std::deque< cv::Mat > > subframes_0;
 
 void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
 {
@@ -37,30 +38,50 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
                 cv::Point2f(msg->blinkers[i].u, msg->blinkers[i].v),
                 patch);
 
-        // check if the blinker has been seen
+        // save patch
+        subframes_0[id].push_front(patch);
+
+        // check if the blinker is new
         if( subframes_0.find(id) == subframes_0.end() )
         {
-
-            // save patch
-            subframes_0[id].push_back(patch);
 
             // add id to keys_0
             keys_0.push_back(id);
 
-        } else {
+            // next
+            continue;
 
-            // compute high-low
-            // TODO: How should I do this?
-            // (a) compute absdiff of patches and reuse earlier method - might work
-            // (b) match blinkers (u,v)'s with feature (u,v)'s - might be harder
+        }
 
-            // treshold
+        // maintain size
+        if (subframes_0[id].size() < 16)
+        {
+            continue;
+        }
+
+        // compute high-low
+        // TODO: How should I do this?
+        // (a) compute absdiff of patches and reuse earlier method - might work
+        // (b) match blinkers (u,v)'s with feature (u,v)'s - might be harder
+        
+        unsigned int even = 0;
+        unsigned int odd = 0;
+        for (int j = 0; j < 6; j++)
+        {
+            // compute intensity change
+            cv::Mat D_even;
+            cv::Mat D_odd;
+            cv::subtract(subframes_0[id][2*j  ], subframes_0[id][2*j+2], D_even);
+            cv::subtract(subframes_0[id][2*j+1], subframes_0[id][2*j+3], D_odd);
+
+            // blob detector
 
             // append to patterns list
 
-            // save patch
-
         }
+
+        // pop oldest to maintain size
+        subframes_0[id].pop_back();
 
     }
 
