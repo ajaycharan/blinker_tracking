@@ -142,6 +142,19 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
 
 }
 
+void generate_lookup_table(std::vector< BlinkerID >& blinker_ids)
+{
+
+    for (int i = 0; i < blinker_ids.size(); i++)
+    {
+        unsigned char transition_pattern = blinker_ids[i].blink_code;
+        transition_pattern = ~(transition_pattern & 
+                (transition_pattern >> 1 | transition_pattern << 7));
+
+        std::cout << (int) transition_pattern << std::endl;
+    }
+}
+
 void load_blinker_database(std::string f, std::vector< BlinkerID >& blinker_ids)
 {
     // open file
@@ -181,6 +194,7 @@ int main(int argc, char* argv[])
     // load blinker database
     std::vector< BlinkerID > blinker_ids;
     load_blinker_database(blinker_database, blinker_ids);
+    generate_lookup_table(blinker_ids);
 
     ros::Subscriber blinker_sub;
     blinker_sub = nh.subscribe("blinkers", 10, &blinker_callback);
