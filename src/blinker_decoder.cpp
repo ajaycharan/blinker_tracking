@@ -3,12 +3,16 @@
 #include <opencv/cv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+#include <image_transport/image_transport.h>
+
 #include <vector>
 #include <deque>
 #include <unordered_map>
 #include <algorithm>
 
 #include <blinker_tracking/BlinkersWithImage.h>
+
+image_transport::Publisher debug_pub;
 
 // parameter
 double width;
@@ -74,6 +78,8 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
             cv::subtract(subframes_0[id][2*j  ], subframes_0[id][2*j+2], D_even);
             cv::subtract(subframes_0[id][2*j+1], subframes_0[id][2*j+3], D_odd);
 
+            // publish image to test 
+
             // blob detector
 
             // append to patterns list
@@ -116,6 +122,7 @@ int main(int argc, char* argv[])
 {
     ros::init(argc, argv, "blinker_decoder");
     ros::NodeHandle nh("~");
+    image_transport::ImageTransport it(nh);
 
     nh.param(std::string("width"), width, 50.0);
     nh.param(std::string("height"), height, 50.0);
