@@ -181,19 +181,9 @@ int main(int argc, char* argv[])
     // load blinker database
     std::vector< BlinkerID > blinker_ids;
     load_blinker_database(blinker_database, blinker_ids);
-    
-    for(int i = 0; i < blinker_ids.size(); i++)
-    {
-        std::cout << blinker_ids[i].id << std::endl;
-        std::cout << blinker_ids[i].blink_code << std::endl;
-    }
-    std::cout << std::endl;
 
     ros::Subscriber blinker_sub;
     blinker_sub = nh.subscribe("blinkers", 10, &blinker_callback);
-
-    ros::Subscriber blinker_database_sub;
-    // blinker_database_sub = nh.subscribe("blinkers", 10, &bdb_callback);
 
     debug_pub = it.advertise("image_out", 10);
 
