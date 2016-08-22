@@ -45,7 +45,7 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
                 patch);
 
         // save patch
-        subframes[id].push_front(patch);
+        subframes[id].push_back(patch);
 
         // maintain size
         if (subframes[id].size() < 18)
@@ -65,8 +65,8 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
             // compute intensity change
             cv::Mat m_even;
             cv::Mat m_odd;
-            cv::subtract(subframes[id][2*j  ], subframes[id][2*j+2], m_even);
-            cv::subtract(subframes[id][2*j+1], subframes[id][2*j+3], m_odd);
+            cv::absdiff(subframes[id][2*j  ], subframes[id][2*j+2], m_even);
+            cv::absdiff(subframes[id][2*j+1], subframes[id][2*j+3], m_odd);
 
             cv::Mat bm_even;
             cv::Mat bm_odd;
@@ -103,7 +103,7 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
         std::cout << "Odd Pattern : " << odd << std::endl;
 
         // pop oldest to maintain size
-        subframes[id].pop_back();
+        subframes[id].pop_front();
 
     }
 
