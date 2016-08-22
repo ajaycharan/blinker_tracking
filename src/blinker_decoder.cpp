@@ -3,8 +3,8 @@
 #include <opencv/cv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+#include <vector>
 #include <unordered_map>
-#include <queue>
 #include <algorithm>
 
 #include <blinker_tracking/BlinkersWithImage.h>
@@ -14,8 +14,7 @@ double width;
 double height;
 
 std::vector< unsigned int > keys_0;
-std::unordered_map< unsigned int, std::queue<int> > blinker_patterns;
-std::unordered_map< unsigned int, cv::Mat > subframes_0;
+std::unordered_map< unsigned int, std::vector< cv::Mat > > subframes_0;
 
 void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
 {
@@ -39,11 +38,11 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
                 patch);
 
         // check if the blinker has been seen
-        if( blinker_patterns.find(id) == blinker_patterns.end() )
+        if( subframes_0.find(id) == subframes_0.end() )
         {
 
             // save patch
-            subframes_0[id] = patch;
+            subframes_0[id].push_back(patch);
 
             // add id to keys_0
             keys_0.push_back(id);
@@ -51,7 +50,9 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
         } else {
 
             // compute high-low
-            cv::Mat intensity_change = patch - subframes_0[id];
+            // TODO: How should I do this?
+            // (a) compute absdiff of patches and reuse earlier method - might work
+            // (b) match blinkers (u,v)'s with feature (u,v)'s - might be harder
 
             // treshold
 
@@ -81,7 +82,6 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
     // remove each key corresponding to a blinker that has gone missing
     for (int i = 0; i < diff.size(); i++)
     {
-        blinker_patterns.erase(diff[i]);
         subframes_0.erase(diff[i]);
     }
 
