@@ -22,6 +22,8 @@ find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
 
+add_definitions(-std=c++11)
+
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
 ## See http://ros.org/doc/api/catkin/html/user_guide/setup_dot_py.html
@@ -162,6 +164,8 @@ add_executable(blinker_detector src/blinker_detector.cpp)
 
 add_executable(blinker_tracker src/blinker_tracker.cpp)
 
+add_executable(blinker_decoder src/blinker_decoder.cpp)
+
 add_executable(blinker_tracker_viz src/blinker_tracker_viz.cpp)
 
 ## Add cmake target dependencies of the executable
@@ -175,6 +179,11 @@ add_dependencies(blinker_detector
 
 add_dependencies(blinker_tracker
     ${${PROJECT_NAME}_EXPORTED_TARGETS} 
+    ${catkin_EXPORTED_TARGETS}
+    )
+
+add_dependencies(blinker_decoder
+    ${${PROJECT_NAME}_EXPORTED_TARGETS}
     ${catkin_EXPORTED_TARGETS}
     )
 
@@ -196,6 +205,12 @@ target_link_libraries(blinker_detector
 
 target_link_libraries(blinker_tracker
   ${catkin_LIBRARIES}
+  ${Boost_LIBRARIES}
+)
+
+target_link_libraries(blinker_decoder
+  ${catkin_LIBRARIES}
+  ${OpenCV_LIBRARIES}
   ${Boost_LIBRARIES}
 )
 

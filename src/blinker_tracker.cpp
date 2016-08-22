@@ -39,6 +39,8 @@ Eigen::Matrix3d Rot_0;
 // array of tracked blinkers
 // TODO: Manage this resource with a mutex lock
 std::vector< blinker_tracking::EKF > particles;
+std::vector< unsigned int > particle_ids;
+unsigned int next_id;
 
 void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
 {
@@ -89,6 +91,7 @@ void imu_callback(const sensor_msgs::Imu::ConstPtr &msg)
         if (area > beta)
         {
             particles.erase(particles.begin() + i);
+            particle_ids.erase(particle_ids.begin() + i);
         }
 
         // std::cout << area << std::endl;
@@ -151,8 +154,8 @@ void blob_callback(const blinker_tracking::BlobsWithImage::ConstPtr &msg)
 
             // add new particle
             particles.push_back(ekf);
-
-            std::cout << ekf << std::endl;
+            particle_ids.push_back(next_id);
+            next_id++;
 
             return;
         } else {
@@ -172,6 +175,7 @@ void blob_callback(const blinker_tracking::BlobsWithImage::ConstPtr &msg)
     for (int i = 0; i < particles.size(); i++)
     {
         blinker_tracking::Blinker b;
+        b.id = particle_ids[i];
         b.u = particles[i].getState()(0);
         b.v = particles[i].getState()(1);
         b.covariance[0] = particles[i].getCovariance()(0, 0);
@@ -180,6 +184,7 @@ void blob_callback(const blinker_tracking::BlobsWithImage::ConstPtr &msg)
         b.covariance[3] = particles[i].getCovariance()(1, 1);
         bwi.blinkers.push_back(b);
 
+        std::cout << "\t id: " << particle_ids[i] << std::endl;
         std::cout << particles[i] << std::endl;
     }
     std::cout << std::endl;
@@ -229,6 +234,8 @@ int main (int argc, char* argv[])
         0.0,    Ry;
 
     Rot_0 = Eigen::Matrix3d::Identity();
+
+    next_id = 0;
 
     ros::Subscriber imu_sub;
     imu_sub = nh.subscribe("imu", 10, &imu_callback);
