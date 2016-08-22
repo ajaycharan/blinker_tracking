@@ -22,6 +22,7 @@
     <!-- Decoder -->
     <node name="blinker_decoder" pkg="blinker_tracking" type="blinker_decoder" output="screen">
         <remap from="~blinkers" to="/blinker_tracker/blinkers"/>
+        <param name="blinker_database" value="$(find blinker_tracking)/config/blinker_database.yaml" />
     </node>
 
     <node pkg="image_view" type="image_view" name="image_view_decoding">

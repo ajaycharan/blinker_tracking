@@ -21,6 +21,7 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(Boost REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 add_definitions(-std=c++11)
 
@@ -129,7 +130,7 @@ catkin_package(
     INCLUDE_DIRS include
     LIBRARIES blinker_tracking
     CATKIN_DEPENDS cv_bridge image_transport message_runtime roscpp rospy sensor_msgs std_msgs cmake_modules
-    DEPENDS Eigen3
+    DEPENDS boost opencv Eigen3 yaml-cpp
     )
 
 ###########
@@ -145,6 +146,7 @@ include_directories(
     ${OpenCV_INCLUDE_DIRS}
     ${Boost_INCLUDE_DIRS}
     ${EIGEN3_INCLUDE_DIR}
+    ${YAML_CPP_INCLUDE_DIR}
     )
 
 ## Declare a C++ library
@@ -212,6 +214,7 @@ target_link_libraries(blinker_decoder
   ${catkin_LIBRARIES}
   ${OpenCV_LIBRARIES}
   ${Boost_LIBRARIES}
+  ${YAML_CPP_LIBRARIES}
 )
 
 target_link_libraries(blinker_tracker_viz
