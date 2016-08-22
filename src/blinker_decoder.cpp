@@ -12,6 +12,12 @@
 
 #include <blinker_tracking/BlinkersWithImage.h>
 
+/*
+ * TODO : Autosize height and width of patches based on the covariance
+ * matrices
+ */
+
+
 image_transport::Publisher debug_pub;
 
 // parameter
@@ -53,11 +59,6 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
             continue;
         }
 
-        // compute high-low
-        // TODO: How should I do this?
-        // (a) compute absdiff of patches and reuse earlier method - might work
-        // (b) match blinkers (u,v)'s with feature (u,v)'s - might be harder
-        
         unsigned int even = 0;
         unsigned int odd = 0;
         for (int j = 0; j < 7; j++)
@@ -140,10 +141,10 @@ int main(int argc, char* argv[])
     ros::NodeHandle nh("~");
     image_transport::ImageTransport it(nh);
 
-    nh.param(std::string("vote_thresh"), vote_thresh, 20);
+    nh.param(std::string("vote_thresh"), vote_thresh, 30);
     nh.param(std::string("intensity_change_thresh"), intensity_change_thresh, 200);
-    nh.param(std::string("width"), width, 50.0);
-    nh.param(std::string("height"), height, 50.0);
+    nh.param(std::string("width"), width, 80.0);
+    nh.param(std::string("height"), height, 80.0);
 
     ros::Subscriber blinker_sub;
     blinker_sub = nh.subscribe("blinkers", 10, &blinker_callback);
