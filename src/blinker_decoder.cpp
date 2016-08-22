@@ -19,7 +19,7 @@ double width;
 double height;
 
 std::vector< unsigned int > keys_0;
-std::unordered_map< unsigned int, std::deque< cv::Mat > > subframes_0;
+std::unordered_map< unsigned int, std::deque< cv::Mat > > subframes;
 
 void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
 {
@@ -43,22 +43,10 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
                 patch);
 
         // save patch
-        subframes_0[id].push_front(patch);
-
-        // check if the blinker is new
-        if( subframes_0.find(id) == subframes_0.end() )
-        {
-
-            // add id to keys_0
-            keys_0.push_back(id);
-
-            // next
-            continue;
-
-        }
+        subframes[id].push_front(patch);
 
         // maintain size
-        if (subframes_0[id].size() < 16)
+        if (subframes[id].size() < 16)
         {
             continue;
         }
@@ -75,10 +63,20 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
             // compute intensity change
             cv::Mat D_even;
             cv::Mat D_odd;
-            cv::subtract(subframes_0[id][2*j  ], subframes_0[id][2*j+2], D_even);
-            cv::subtract(subframes_0[id][2*j+1], subframes_0[id][2*j+3], D_odd);
+            cv::subtract(subframes[id][2*j  ], subframes[id][2*j+2], D_even);
+            cv::subtract(subframes[id][2*j+1], subframes[id][2*j+3], D_odd);
 
             // publish image to test 
+            if (j == 0)
+            {
+                cv_bridge::CvImage out;
+                out.encoding = std::string("mono8");
+                out.image = D_even;
+
+                sensor_msgs::ImagePtr image_ros = out.toImageMsg();
+                image_ros->header.stamp = ros::Time::now();
+                debug_pub.publish(image_ros);
+            }
 
             // blob detector
 
@@ -87,7 +85,7 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
         }
 
         // pop oldest to maintain size
-        subframes_0[id].pop_back();
+        subframes[id].pop_back();
 
     }
 
@@ -109,7 +107,7 @@ void blinker_callback(const blinker_tracking::BlinkersWithImage::ConstPtr &msg)
     // remove each key corresponding to a blinker that has gone missing
     for (int i = 0; i < diff.size(); i++)
     {
-        subframes_0.erase(diff[i]);
+        subframes.erase(diff[i]);
     }
 
     // save keys
@@ -132,6 +130,8 @@ int main(int argc, char* argv[])
 
     ros::Subscriber blinker_database_sub;
     // blinker_database_sub = nh.subscribe("blinkers", 10, &bdb_callback);
+
+    debug_pub = it.advertise("image_out", 10);
 
     ros::spin();
     return 0;
