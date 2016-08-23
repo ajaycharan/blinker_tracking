@@ -148,7 +148,7 @@ void generate_lookup_table(std::vector< BlinkerID >& blinker_ids)
     for (int i = 0; i < blinker_ids.size(); i++)
     {
         unsigned char transition_pattern = blinker_ids[i].blink_code;
-        transition_pattern = ~(transition_pattern & 
+        transition_pattern = (transition_pattern ^
                 (transition_pattern >> 1 | transition_pattern << 7));
 
         std::cout << (int) transition_pattern << std::endl;
